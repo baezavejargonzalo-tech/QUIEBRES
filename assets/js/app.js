@@ -152,8 +152,9 @@ function renderStatusHero(d) {
   const totalGrupos  = cadenas.reduce((s, c) => s + c.q, 0) || 1;
   const totalPlantas = plantas.reduce((s, p) => s + p.q, 0) || 1;
 
-  // 30s — ¿qué SKU lo está provocando?
-  const topSku = (d.skus && d.skus[0]) || null;
+  // 30s — ¿qué SKUs lo están provocando? (top 10 a primera vista)
+  const top10Sku = (d.skus || []).slice(0, 10);
+  const topSku = top10Sku[0] || null;
 
   el.innerHTML = `
     <div class="status-step">
@@ -176,12 +177,14 @@ function renderStatusHero(d) {
       ${!topGrupo && !topPlanta ? '<div class="status-badge-sub">Sin datos para este filtro</div>' : ''}
     </div>
     <div class="status-step">
-      <div class="status-step-eyebrow">¿Qué lo provoca?</div>
-      ${topSku ? `
-        <div style="font-size:13px;font-weight:700;color:var(--dark);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${topSku.n}">${topSku.n}</div>
-        <div class="status-badge-sub">${topSku.pl} · ${topSku.cat}</div>
-        <div style="font-family:var(--cond);font-size:22px;font-weight:800;color:var(--red);margin-top:5px">${fmt(topSku.q)} <span style="font-size:11px;font-weight:700;color:var(--muted)">ton</span></div>
-      ` : '<div class="status-badge-sub">Sin datos para este filtro</div>'}
+      <div class="status-step-eyebrow">¿Qué lo provoca? <em>· Top 10 SKU</em></div>
+      ${top10Sku.length ? `<div class="status-sku-list">
+        ${top10Sku.map((s,i) => `<div class="status-sku-row">
+          <div class="status-sku-rank">${i+1}</div>
+          <div class="status-sku-name" title="${s.n}">${s.n}</div>
+          <div class="status-sku-val">${fmt(s.q)}<small>t</small></div>
+        </div>`).join('')}
+      </div>` : '<div class="status-badge-sub">Sin datos para este filtro</div>'}
     </div>
     <div class="status-step">
       <div class="status-step-eyebrow">¿Qué revisar ahora?</div>

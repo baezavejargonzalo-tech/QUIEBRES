@@ -108,12 +108,13 @@ section{padding:1.5rem}
 .kpi-meta{font-size:12px;color:var(--muted);margin-top:4px}
 
 /* STATUS HERO — escalera 5s / 15s / 30s / Acción */
-.status-hero{display:grid;grid-template-columns:repeat(4,1fr);background:#fff;
+.status-hero{display:grid;grid-template-columns:.85fr 1fr 1.5fr 1.05fr;background:#fff;
   border:1.5px solid var(--border);border-radius:16px;box-shadow:var(--shadow2);overflow:hidden}
 .status-step{padding:1.2rem 1.35rem;display:flex;flex-direction:column;gap:2px;min-width:0}
 .status-step+.status-step{border-left:1.5px solid var(--border)}
 .status-step-eyebrow{font-family:var(--cond);font-size:10px;font-weight:800;letter-spacing:.09em;
-  text-transform:uppercase;color:var(--muted2);margin-bottom:.6rem}
+  text-transform:uppercase;color:var(--muted2);margin-bottom:.6rem;display:flex;align-items:baseline;gap:6px}
+.status-step-eyebrow em{font-style:normal;font-weight:600;letter-spacing:0;text-transform:none;color:var(--muted2);font-size:10px}
 .status-badge{display:flex;align-items:center;gap:8px;font-family:var(--cond);font-size:24px;font-weight:800;line-height:1}
 .status-badge-sub{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.4}
 .status-where-row{display:flex;align-items:baseline;gap:8px;margin-bottom:9px}
@@ -124,10 +125,17 @@ section{padding:1.5rem}
 .status-action{font-size:12.5px;line-height:1.55;color:var(--text)}
 .status-action a{color:var(--red);font-weight:700;text-decoration:none;white-space:nowrap}
 .status-action a:hover{text-decoration:underline}
-@media(max-width:900px){.status-hero{grid-template-columns:1fr 1fr}.status-step:nth-child(3){border-left:none}}
+.status-sku-list{display:flex;flex-direction:column;gap:4px}
+.status-sku-row{display:flex;align-items:baseline;gap:8px;font-size:11.5px;line-height:1.3}
+.status-sku-rank{font-family:var(--cond);font-weight:800;color:var(--muted2);font-size:11px;min-width:14px;flex-shrink:0;font-variant-numeric:tabular-nums}
+.status-sku-name{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--dark);font-weight:600}
+.status-sku-val{font-family:var(--cond);font-weight:800;color:var(--red);flex-shrink:0;font-variant-numeric:tabular-nums}
+.status-sku-val small{font-family:var(--font);font-weight:700;color:var(--muted);font-size:9px;margin-left:2px}
+@media(max-width:900px){.status-hero{grid-template-columns:1fr 1fr}.status-step:nth-child(3){border-left:none;grid-column:span 2}}
 @media(max-width:560px){.status-hero{grid-template-columns:1fr}
   .status-step{border-left:none!important;border-top:1.5px solid var(--border)}
-  .status-step:first-child{border-top:none}}
+  .status-step:first-child{border-top:none}
+  .status-step:nth-child(3){grid-column:auto}}
 
 /* BARRAS HORIZONTALES (rankings comparativos: grupos, plantas, SKUs) */
 .hbar{display:flex;align-items:center;gap:10px;margin-bottom:12px}
