@@ -42,14 +42,6 @@
   </div>
 </div>
 
-<div class="quicknav">
-  <a href="#sec-consolidado">📊 Resumen</a>
-  <a href="#sec-grupos">🏷️ Grupos de marketing</a>
-  <a href="#sec-plantas">🏭 Plantas</a>
-  <a href="#sec-semanas">📅 Semanas</a>
-  <a href="#sec-skus">🔎 Detalle SKUs</a>
-</div>
-
 <div class="filterbar">
   <div class="filterbar-inner">
     <div class="filter-group">
@@ -110,6 +102,13 @@
       </select>
     </div>
     <div class="filter-group">
+      <span class="filter-label">Grupo</span>
+      <select class="week-sel tipo-toggle" id="grupoSel" onchange="setGrupo(this.value)"
+              style="min-width:140px" title="Ver el top de quiebres de un grupo de marketing">
+        <option value="all">Todos los grupos</option>
+      </select>
+    </div>
+    <div class="filter-group">
       <span class="filter-label">Categoría</span>
       <select class="week-sel tipo-toggle" id="categoriaSel" onchange="setCategoria(this.value)"
               style="min-width:150px" title="Filtrar la tabla de Top SKUs por categoría">
@@ -142,6 +141,9 @@
 <!-- ② Cadenas -->
 <section class="sec-main" id="sec-grupos">
   <div class="section-label" id="lbl-cadena">🏷️ Quiebres por Grupo de Marketing</div>
+  <div id="grupoFiltroNote" style="display:none;font-size:12px;color:var(--muted);margin:-8px 0 12px">
+    Filtrado a un grupo de marketing — esta vista y el detalle de SKUs a la derecha se acotan a ese grupo. Las secciones de Plantas, Semanas y Detalle SKUs no se pueden filtrar por grupo: ese dato no viene desglosado por SKU en el archivo actual.
+  </div>
   <div class="g2">
     <div class="panel">
       <div class="panel-title">Ranking por Grupo de Marketing <em id="cadenaEm"></em></div>

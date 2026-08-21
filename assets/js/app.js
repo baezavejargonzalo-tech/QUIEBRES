@@ -7,6 +7,7 @@ let currentVista = 'quiebres';
 let currentTipo  = 'all';
 let currentSem   = 'all';
 let currentPlanta = 'all';
+let currentGrupo = 'all';
 let currentCategoria = 'all';
 let skuSearch = '';
 let currentMes = 'all';
@@ -92,6 +93,7 @@ function resetFiltros() {
   currentSem = 'all';
   currentMes = 'all';
   currentPlanta = 'all';
+  currentGrupo = 'all';
   currentCategoria = 'all';
   skuSearch = '';
   document.querySelectorAll('.filterbar .tipo-btn').forEach((b,i) => b.classList.toggle('active', i === 0));
@@ -101,6 +103,8 @@ function resetFiltros() {
   if (mSel) mSel.value = 'all';
   const pSel = document.getElementById('plantaSel');
   if (pSel) pSel.value = 'all';
+  const gSel = document.getElementById('grupoSel');
+  if (gSel) gSel.value = 'all';
   const cSel = document.getElementById('categoriaSel');
   if (cSel) cSel.value = 'all';
   const sInput = document.getElementById('skuSearchInput');
@@ -232,12 +236,23 @@ function renderKPIs(d) {
 
 // ── SECCIÓN ② CADENAS ─────────────────────────────────────────────────────────
 function renderCadenas(d) {
-  const max = d.cadenas.length ? Math.max(...d.cadenas.map(c => c.q)) : 1;
-  const totalQ = d.cadenas.reduce((s, c) => s + c.q, 0) || 1;
+  const cadenasAll  = d.cadenas || [];
+  const cadenasView = currentGrupo === 'all' ? cadenasAll : cadenasAll.filter(c => c.n === currentGrupo);
+  const max = cadenasAll.length ? Math.max(...cadenasAll.map(c => c.q)) : 1;
+  const totalQ = cadenasAll.reduce((s, c) => s + c.q, 0) || 1;
   const weeks = getSems().map(s => s.s).slice(-8); // últimas semanas disponibles, serie real por grupo
-  document.getElementById('cadenaEm').textContent = fmt(d.q) + ' ton total';
-  document.getElementById('cadenasBars').innerHTML = d.cadenas.length
-    ? d.cadenas.map((c,i) => {
+
+  const noteEl = document.getElementById('grupoFiltroNote');
+  if (noteEl) noteEl.style.display = currentGrupo === 'all' ? 'none' : '';
+
+  const emEl = document.getElementById('cadenaEm');
+  emEl.textContent = (currentGrupo !== 'all' && cadenasView[0])
+    ? `${fmt(cadenasView[0].q)} ton · ${(cadenasView[0].q/totalQ*100).toFixed(1)}% del total`
+    : fmt(d.q) + ' ton total';
+
+  document.getElementById('cadenasBars').innerHTML = cadenasView.length
+    ? cadenasView.map((c) => {
+        const i = cadenasAll.indexOf(c); // color consistente con el ranking sin filtrar
         const pctFcst  = c.fcst > 0 ? (c.q/c.fcst*100) : 0;
         const pctTotal = (c.q/totalQ*100).toFixed(1);
 
@@ -278,14 +293,16 @@ function renderCadenas(d) {
         </div>
       </div>`;
       }).join('')
-    : '<div class="empty">Sin quiebres para este filtro</div>';
+    : `<div class="empty">${currentGrupo !== 'all' ? 'Este grupo no tiene quiebres para este filtro' : 'Sin quiebres para este filtro'}</div>`;
 
-  document.getElementById('drillCadena').innerHTML = d.cadenas.length
-    ? d.cadenas.map((c,i) => {
+  document.getElementById('drillCadena').innerHTML = cadenasView.length
+    ? cadenasView.map((c, k) => {
+        const i = cadenasAll.indexOf(c); // color consistente con el ranking sin filtrar
         const skus  = (d.skuPorCadena || {})[c.n] || [];
         const maxQ  = skus.length ? Math.max(...skus.map(s => s.q)) : 1;
+        const forced = currentGrupo !== 'all'; // filtrado a un solo grupo: mostrar el detalle abierto de inmediato
         return `<div class="drill">
-          <div class="drill-hdr" onclick="toggleDrill(${i})">
+          <div class="drill-hdr" onclick="toggleDrill(${k})">
             <div class="drill-dot" style="background:${barCol(i)}"></div>
             <div class="drill-name">${c.n}</div>
             <div style="text-align:right;flex-shrink:0">
@@ -295,9 +312,9 @@ function renderCadenas(d) {
             <div style="font-size:10px;color:var(--muted);text-align:right">
               FCST: <span style="font-family:var(--cond);font-weight:700;color:var(--dark2)">${fmt(c.fcst)}</span> ton
             </div>
-            <div class="drill-arrow" id="arr${i}">›</div>
+            <div class="drill-arrow ${forced ? 'open' : ''}" id="arr${k}">›</div>
           </div>
-          <div class="drill-body" id="bdy${i}">
+          <div class="drill-body ${forced ? 'open' : ''}" id="bdy${k}">
             <div style="font-size:10px;font-weight:700;color:var(--muted2);letter-spacing:.07em;text-transform:uppercase;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--border)">Top 5 SKUs</div>
             ${skus.length
               ? skus.map((s,j) => `
@@ -513,6 +530,22 @@ function initPlantaSelect() {
 }
 function setPlanta(val) {
   currentPlanta = val;
+  renderAll();
+}
+
+function initGrupoSelect() {
+  const sel = document.getElementById('grupoSel');
+  if (!sel || sel.options.length > 1) return;
+  // grupos desde los datos de quiebres globales, en el mismo orden del ranking (mayor a menor)
+  const grupos = (DB_QUIEBRES.all.all.cadenas || []).map(c => c.n).filter(Boolean);
+  grupos.forEach(g => {
+    const o = document.createElement('option');
+    o.value = g; o.textContent = g;
+    sel.appendChild(o);
+  });
+}
+function setGrupo(val) {
+  currentGrupo = val;
   renderAll();
 }
 
@@ -881,6 +914,7 @@ function initRiesgosControls(){
 // ── INICIO ────────────────────────────────────────────────────────────────────
 initMesSelect();
 initPlantaSelect();
+initGrupoSelect();
 initCategoriaSelect();
 initRiesgosControls();
 renderAll();
