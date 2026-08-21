@@ -142,32 +142,46 @@ function renderStatusHero(d) {
   const labelAcc = currentVista === 'quiebres' ? 'quebrado'
                  : currentVista === 'bloqueos' ? 'bloqueado' : 'quebrado + bloqueado';
 
-  // 5s — ¿estamos bien o mal? (gravedad relativa al FCST del propio filtro)
-  const pctGlobal = d.fcst > 0 ? (d.q / d.fcst * 100) : 0;
+  const cadenas = d.cadenas || [];
+  const plantas = d.plantas || [];
+  // Si hay un grupo de marketing filtrado, toda la cabecera se acota a ese grupo
+  const grupoActivo = currentGrupo !== 'all' ? cadenas.find(c => c.n === currentGrupo) : null;
+
+  // 5s — ¿estamos bien o mal? (gravedad relativa al FCST del propio filtro/grupo)
+  const baseQ    = grupoActivo ? grupoActivo.q    : d.q;
+  const baseFcst = grupoActivo ? grupoActivo.fcst : d.fcst;
+  const pctGlobal = baseFcst > 0 ? (baseQ / baseFcst * 100) : 0;
   const estado = pctGlobal > 15 ? { ic: '🔴', txt: 'CRÍTICO',       col: 'var(--red)' }
                : pctGlobal > 7  ? { ic: '🟡', txt: 'ATENCIÓN',      col: '#B8860B' }
                :                  { ic: '🟢', txt: 'BAJO CONTROL', col: '#1a8a3a' };
 
-  // 15s — ¿dónde está el problema? (top grupo de marketing y top planta)
-  const cadenas = d.cadenas || [];
-  const plantas = d.plantas || [];
+  // 15s — ¿dónde está el problema? (top grupo de marketing y top planta; o el grupo filtrado)
   const topGrupo  = cadenas[0] || null;
   const topPlanta = plantas[0] || null;
   const totalGrupos  = cadenas.reduce((s, c) => s + c.q, 0) || 1;
   const totalPlantas = plantas.reduce((s, p) => s + p.q, 0) || 1;
+  const rankGrupoActivo = grupoActivo ? cadenas.indexOf(grupoActivo) + 1 : null;
 
-  // 30s — ¿qué SKUs lo están provocando? (top 10 a primera vista)
-  const top10Sku = (d.skus || []).slice(0, 10);
+  // 30s — ¿qué SKUs lo están provocando? (top 10 a primera vista, o el top 5 del grupo filtrado)
+  const top10Sku = grupoActivo
+    ? ((d.skuPorCadena && d.skuPorCadena[currentGrupo]) || [])
+    : (d.skus || []).slice(0, 10);
   const topSku = top10Sku[0] || null;
 
   el.innerHTML = `
     <div class="status-step">
       <div class="status-step-eyebrow">¿Estamos bien o mal?</div>
       <div class="status-badge" style="color:${estado.col}">${estado.ic} ${estado.txt}</div>
-      <div class="status-badge-sub">${fmt(d.q)} ton ${labelAcc}${d.fcst > 0 ? ' · ' + pctGlobal.toFixed(1) + '% del FCST' : ''}</div>
+      <div class="status-badge-sub">${fmt(baseQ)} ton ${labelAcc}${grupoActivo ? ' en ' + grupoActivo.n : ''}${baseFcst > 0 ? ' · ' + pctGlobal.toFixed(1) + '% del FCST' : ''}</div>
     </div>
     <div class="status-step">
       <div class="status-step-eyebrow">¿Dónde está el problema?</div>
+      ${grupoActivo ? `<div class="status-where-row">
+        <div class="status-where-tag">Grupo</div>
+        <div class="status-where-name" title="${grupoActivo.n}">${grupoActivo.n}</div>
+        <div class="status-where-val">${(grupoActivo.q / totalGrupos * 100).toFixed(0)}%</div>
+      </div>
+      <div class="status-badge-sub">#${rankGrupoActivo} de ${cadenas.length} grupos por quiebre</div>` : `
       ${topGrupo ? `<div class="status-where-row">
         <div class="status-where-tag">Grupo</div>
         <div class="status-where-name" title="${topGrupo.n}">${topGrupo.n}</div>
@@ -178,10 +192,10 @@ function renderStatusHero(d) {
         <div class="status-where-name" title="${topPlanta.n}">${topPlanta.n}</div>
         <div class="status-where-val">${(topPlanta.q / totalPlantas * 100).toFixed(0)}%</div>
       </div>` : ''}
-      ${!topGrupo && !topPlanta ? '<div class="status-badge-sub">Sin datos para este filtro</div>' : ''}
+      ${!topGrupo && !topPlanta ? '<div class="status-badge-sub">Sin datos para este filtro</div>' : ''}`}
     </div>
     <div class="status-step">
-      <div class="status-step-eyebrow">¿Qué lo provoca? <em>· Top 10 SKU</em></div>
+      <div class="status-step-eyebrow">¿Qué lo provoca? <em>· ${grupoActivo ? 'Top SKU del grupo' : 'Top 10 SKU'}</em></div>
       ${top10Sku.length ? `<div class="status-sku-list">
         ${top10Sku.map((s,i) => `<div class="status-sku-row">
           <div class="status-sku-rank">${i+1}</div>
@@ -194,7 +208,9 @@ function renderStatusHero(d) {
       <div class="status-step-eyebrow">¿Qué revisar ahora?</div>
       <div class="status-action">
         ${topSku
-          ? `Revisar disponibilidad de <b>${topSku.n}</b> en ${topSku.pl}${topGrupo ? ` — pesa fuerte en ${topGrupo.n}` : ''}. <a href="#sec-skus">Ver detalle de SKUs ↓</a>`
+          ? grupoActivo
+            ? `Revisar disponibilidad de <b>${topSku.n}</b> en ${topSku.pl} — es el que más pesa dentro de ${grupoActivo.n}. <a href="#sec-grupos">Ver detalle del grupo ↓</a>`
+            : `Revisar disponibilidad de <b>${topSku.n}</b> en ${topSku.pl}${topGrupo ? ` — pesa fuerte en ${topGrupo.n}` : ''}. <a href="#sec-skus">Ver detalle de SKUs ↓</a>`
           : 'No hay suficientes datos para sugerir una acción con este filtro.'}
       </div>
     </div>`;
