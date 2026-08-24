@@ -141,6 +141,8 @@ function renderStatusHero(d) {
 
   const labelAcc = currentVista === 'quiebres' ? 'quebrado'
                  : currentVista === 'bloqueos' ? 'bloqueado' : 'quebrado + bloqueado';
+  const tonLabel = currentVista === 'quiebres' ? 'Ton quebradas'
+                 : currentVista === 'bloqueos' ? 'Ton bloqueadas' : 'Ton combinadas';
 
   const cadenas = d.cadenas || [];
   const plantas = d.plantas || [];
@@ -196,7 +198,9 @@ function renderStatusHero(d) {
     </div>
     <div class="status-step">
       <div class="status-step-eyebrow">¿Qué lo provoca? <em>· ${grupoActivo ? 'Top SKU del grupo' : 'Top 10 SKU'}</em></div>
-      ${top10Sku.length ? `<div class="status-sku-list">
+      ${top10Sku.length ? `
+      <div class="status-sku-head"><span>SKU</span><span>${tonLabel}</span></div>
+      <div class="status-sku-list">
         ${top10Sku.map((s,i) => `<div class="status-sku-row">
           <div class="status-sku-rank">${i+1}</div>
           <div class="status-sku-name" title="${s.n}">${s.n}</div>
