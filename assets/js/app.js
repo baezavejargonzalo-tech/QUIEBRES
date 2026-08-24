@@ -170,6 +170,17 @@ function renderStatusHero(d) {
     : (d.skus || []).slice(0, 10);
   const topSku = top10Sku[0] || null;
 
+  // Acción — cruce con Riesgo de Quiebre: ¿alguno de los top 3 SKU en quiebre
+  // también aparece en el Top 50 de menor alcance de stock (RIESGOS)?
+  // Es información hacia adelante (¿va a seguir pasando?), no una repetición del top de al lado.
+  let riesgoMatch = null;
+  for (let i = 0; i < Math.min(3, top10Sku.length); i++) {
+    const s = top10Sku[i];
+    const hit = (typeof RIESGOS !== 'undefined' ? RIESGOS : []).find(r => r.n.toUpperCase().trim() === s.n.toUpperCase().trim());
+    if (hit) { riesgoMatch = { sku: s, rank: i + 1, riesgo: hit }; break; }
+  }
+  const irARiesgos = `setVista('riesgos', document.getElementById('vbtn-riesgos')); return false;`;
+
   el.innerHTML = `
     <div class="status-step">
       <div class="status-step-eyebrow">¿Estamos bien o mal?</div>
@@ -211,11 +222,16 @@ function renderStatusHero(d) {
     <div class="status-step">
       <div class="status-step-eyebrow">¿Qué revisar ahora?</div>
       <div class="status-action">
-        ${topSku
-          ? grupoActivo
-            ? `Revisar disponibilidad de <b>${topSku.n}</b> en ${topSku.pl} — es el que más pesa dentro de ${grupoActivo.n}. <a href="#sec-grupos">Ver detalle del grupo ↓</a>`
-            : `Revisar disponibilidad de <b>${topSku.n}</b> en ${topSku.pl}${topGrupo ? ` — pesa fuerte en ${topGrupo.n}` : ''}. <a href="#sec-skus">Ver detalle de SKUs ↓</a>`
-          : 'No hay suficientes datos para sugerir una acción con este filtro.'}
+        ${riesgoMatch ? `
+          <span class="chip ${riesgoMatch.riesgo.riesgo === 'critico' ? 'c-red' : 'c-amb'}">${riesgoMatch.riesgo.riesgo === 'critico' ? '🔴 CRÍTICO' : '🟡 ALERTA'}</span>
+          <b>${riesgoMatch.sku.n}</b> (SKU #${riesgoMatch.rank} en quiebre) ya está en riesgo de volver a quebrar:
+          alcanza para <b>${riesgoMatch.riesgo.alcance.toFixed(1)} sem</b> de stock en ${riesgoMatch.riesgo.planta}.
+          <a href="#" onclick="${irARiesgos}">Ver en Riesgo de Quiebre →</a>
+        ` : topSku ? `
+          Ninguno de los SKU con mayor quiebre${grupoActivo ? ' de ' + grupoActivo.n : ''} aparece hoy en el
+          Top 50 de menor alcance de stock (Riesgo de Quiebre) — no significa que estén sanos, ese top solo
+          cubre los 50 casos más urgentes. <a href="#" onclick="${irARiesgos}">Revisar Riesgo de Quiebre →</a>
+        ` : 'No hay suficientes datos para sugerir una acción con este filtro.'}
       </div>
     </div>`;
 }
