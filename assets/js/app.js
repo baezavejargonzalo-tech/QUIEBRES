@@ -768,6 +768,62 @@ function renderCharts(){
   bar(document.getElementById('chartCat'),  Object.entries(BY_CAT),  ([,v])=>v,k=>k.length>26?k.slice(0,26)+'…':k,'SKUs');
   if(BY_SUBCAT) bar(document.getElementById('chartSubcat'),Object.entries(BY_SUBCAT),([,v])=>v,k=>k.length>26?k.slice(0,26)+'…':k,'ton');
 }
+// ── EXPORTAR TOP 50 A EXCEL (CSV) ──────────────────────────────────────────────
+// Junta, por SKU: estado de riesgo, stock, FCST, alcance (de RIESGOS),
+// quiebre (buscado por nombre en el listado de quiebres) y merma (buscada
+// por código de SKU en MERMA_VENC). Se exporta como CSV separado por ";"
+// con BOM UTF-8 — Excel lo abre directo, con acentos y decimales correctos.
+function exportRiesgosExcel(){
+  let filtered = riesgosFilter === 'all' ? RIESGOS : RIESGOS.filter(r => r.riesgo === riesgosFilter);
+  if (riesgosPlanta !== 'all') filtered = filtered.filter(r => r.planta === riesgosPlanta);
+  if (!filtered.length) { alert('No hay filas para exportar con este filtro.'); return; }
+
+  const quiebreByName = {};
+  (DB_QUIEBRES.all.all.skus || []).forEach(s => { quiebreByName[s.n.toUpperCase().trim()] = s.q; });
+  const mermaBySku = {};
+  (MERMA_VENC || []).forEach(m => { mermaBySku[m.sku] = m; });
+
+  const headers = ['SKU','Producto','Categoría','Planta','Tipo','Estado riesgo',
+    'Stock disponible (kg)','Stock bloqueado (kg)','FCST semanal (kg)','Alcance (sem)',
+    'Quiebre (ton)','Merma - días a vencer','Merma - kg en riesgo','Merma - nivel'];
+  const numCols = [6,7,8,9,10,11,12];
+
+  const rows = filtered.map(r => {
+    const q = quiebreByName[r.n.toUpperCase().trim()];
+    const m = mermaBySku[r.sku];
+    return [
+      r.sku, r.n, r.cat, r.planta, r.tipo || '',
+      r.riesgo === 'critico' ? 'Crítico' : 'Alerta',
+      r.stock, r.stock_bloq, r.fcst, r.alcance,
+      q !== undefined ? q : '',
+      m ? m.dias : '',
+      m ? m.kilos : '',
+      m ? (m.nivel === 'critico' ? 'Crítico' : 'Alerta') : ''
+    ];
+  });
+
+  const escCsv = v => {
+    if (v === null || v === undefined || v === '') return '';
+    const s = String(v).replace(/"/g, '""');
+    return /[;"\n]/.test(s) ? `"${s}"` : s;
+  };
+  const cellCsv = (v, i) => numCols.includes(i) && typeof v === 'number' ? String(v).replace('.', ',') : escCsv(v);
+
+  const lines = [headers.map(escCsv).join(';')];
+  rows.forEach(row => lines.push(row.map(cellCsv).join(';')));
+
+  const csv = '\uFEFF' + lines.join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `riesgo_quiebre_${riesgosFilter}_${riesgosPlanta}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 function renderRiesgosTable(){
   const body=document.getElementById('riesgosBody');if(!body)return;
   let filtered=riesgosFilter==='all'?RIESGOS:RIESGOS.filter(r=>r.riesgo===riesgosFilter);

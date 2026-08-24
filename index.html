@@ -267,10 +267,12 @@
   <div class="panel">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px">
       <div class="panel-title" style="margin:0">📋 Top 50 · Menor Alcance de Stock</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
         <button onclick="filterRiesgos('all',this)" class="rpill active" style="font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;border:1.5px solid #C8001E;background:#fff0f0;color:#C8001E;cursor:pointer">Todos</button>
         <button onclick="filterRiesgos('critico',this)" class="rpill" style="font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;border:1.5px solid #ddd;background:#fff;color:#555;cursor:pointer">🔴 Críticos</button>
         <button onclick="filterRiesgos('alerta',this)" class="rpill" style="font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;border:1.5px solid #ddd;background:#fff;color:#555;cursor:pointer">🟡 Alertas</button>
+        <div style="width:1px;height:18px;background:var(--border);margin:0 2px"></div>
+        <button onclick="exportRiesgosExcel()" title="Incluye estado de riesgo, stock disponible, FCST semanal, alcance, quiebre y merma (cuando el dato existe)" style="font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;border:1.5px solid #1A5276;background:#eaf4fb;color:#1A5276;cursor:pointer">⬇ Descargar Excel</button>
       </div>
     </div>
     <div style="overflow-x:auto">
