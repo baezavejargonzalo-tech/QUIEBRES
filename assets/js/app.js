@@ -109,7 +109,7 @@ function resetFiltros() {
   if (cSel) cSel.value = 'all';
   const sInput = document.getElementById('skuSearchInput');
   if (sInput) sInput.value = '';
-  renderAll();
+  if (currentVista === 'riesgos') renderRiesgos(); else renderAll();
 }
 
 // ── RENDER PRINCIPAL ───────────────────────────────────────────────────────────
@@ -768,14 +768,49 @@ function renderCharts(){
   bar(document.getElementById('chartCat'),  Object.entries(BY_CAT),  ([,v])=>v,k=>k.length>26?k.slice(0,26)+'…':k,'SKUs');
   if(BY_SUBCAT) bar(document.getElementById('chartSubcat'),Object.entries(BY_SUBCAT),([,v])=>v,k=>k.length>26?k.slice(0,26)+'…':k,'ton');
 }
+// CPFR: en este archivo "tipo" (Refrigerados/Abarrotes) es la clasificación
+// Frío/Seco que usan los equipos de planificación.
+const cpfrLabel = tipo => tipo === 'Refrigerados' ? 'Frío' : tipo === 'Abarrotes' ? 'Seco' : (tipo || '—');
+
+// Filtro combinado de la tabla Top 50 / export: sus propios controles
+// (estado crítico/alerta, planta) MÁS los filtros activos en la pestaña
+// Quiebres (Tipo=CPFR, Categoría, Búsqueda de SKU). La Planta de la pestaña
+// Quiebres se usa solo si no se tocó el filtro de Planta propio de esta tabla.
+function getFilteredRiesgos(){
+  let filtered = riesgosFilter === 'all' ? RIESGOS : RIESGOS.filter(r => r.riesgo === riesgosFilter);
+  const effectivePlanta = riesgosPlanta !== 'all' ? riesgosPlanta : currentPlanta;
+  if (effectivePlanta !== 'all') filtered = filtered.filter(r => r.planta === effectivePlanta);
+  if (currentTipo !== 'all') filtered = filtered.filter(r => r.tipo === currentTipo);
+  if (currentCategoria !== 'all') filtered = filtered.filter(r => r.cat === currentCategoria);
+  const q = skuSearch.trim().toLowerCase();
+  if (q) filtered = filtered.filter(r => r.n.toLowerCase().includes(q));
+  return filtered;
+}
+
+function renderRiesgoCrossFilterNote(){
+  const el = document.getElementById('riesgoCrossFilterNote');
+  if (!el) return;
+  const activos = [];
+  if (currentTipo !== 'all') activos.push(`CPFR: ${cpfrLabel(currentTipo)}`);
+  if (currentCategoria !== 'all') activos.push(`Categoría: ${currentCategoria}`);
+  if (skuSearch.trim()) activos.push(`Búsqueda: "${skuSearch.trim()}"`);
+  if (riesgosPlanta === 'all' && currentPlanta !== 'all') activos.push(`Planta: ${currentPlanta}`);
+  if (activos.length) {
+    el.style.display = '';
+    el.innerHTML = `🔗 También filtrado desde la pestaña Quiebres — ${activos.join(' · ')}. <button onclick="resetFiltros()" style="border:none;background:none;color:var(--red);font-weight:700;font-size:12px;cursor:pointer;padding:0;text-decoration:underline">Quitar</button>`;
+  } else {
+    el.style.display = 'none';
+  }
+}
+
 // ── EXPORTAR TOP 50 A EXCEL (CSV) ──────────────────────────────────────────────
 // Junta, por SKU: estado de riesgo, stock, FCST, alcance (de RIESGOS),
 // quiebre (buscado por nombre en el listado de quiebres) y merma (buscada
 // por código de SKU en MERMA_VENC). Se exporta como CSV separado por ";"
 // con BOM UTF-8 — Excel lo abre directo, con acentos y decimales correctos.
+// Usa exactamente el mismo filtro combinado que se ve en la tabla de pantalla.
 function exportRiesgosExcel(){
-  let filtered = riesgosFilter === 'all' ? RIESGOS : RIESGOS.filter(r => r.riesgo === riesgosFilter);
-  if (riesgosPlanta !== 'all') filtered = filtered.filter(r => r.planta === riesgosPlanta);
+  const filtered = getFilteredRiesgos();
   if (!filtered.length) { alert('No hay filas para exportar con este filtro.'); return; }
 
   const quiebreByName = {};
@@ -783,7 +818,7 @@ function exportRiesgosExcel(){
   const mermaBySku = {};
   (MERMA_VENC || []).forEach(m => { mermaBySku[m.sku] = m; });
 
-  const headers = ['SKU','Producto','Categoría','Planta','Tipo','Estado riesgo',
+  const headers = ['SKU','Producto','Categoría','Planta','CPFR','Estado riesgo',
     'Stock disponible (kg)','Stock bloqueado (kg)','FCST semanal (kg)','Alcance (sem)',
     'Quiebre (ton)','Merma - días a vencer','Merma - kg en riesgo','Merma - nivel'];
   const numCols = [6,7,8,9,10,11,12];
@@ -792,7 +827,7 @@ function exportRiesgosExcel(){
     const q = quiebreByName[r.n.toUpperCase().trim()];
     const m = mermaBySku[r.sku];
     return [
-      r.sku, r.n, r.cat, r.planta, r.tipo || '',
+      r.sku, r.n, r.cat, r.planta, cpfrLabel(r.tipo),
       r.riesgo === 'critico' ? 'Crítico' : 'Alerta',
       r.stock, r.stock_bloq, r.fcst, r.alcance,
       q !== undefined ? q : '',
@@ -817,7 +852,8 @@ function exportRiesgosExcel(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `riesgo_quiebre_${riesgosFilter}_${riesgosPlanta}.csv`;
+  const effectivePlanta = riesgosPlanta !== 'all' ? riesgosPlanta : currentPlanta;
+  a.download = `riesgo_quiebre_${riesgosFilter}_${effectivePlanta}_${currentTipo}.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -826,8 +862,8 @@ function exportRiesgosExcel(){
 
 function renderRiesgosTable(){
   const body=document.getElementById('riesgosBody');if(!body)return;
-  let filtered=riesgosFilter==='all'?RIESGOS:RIESGOS.filter(r=>r.riesgo===riesgosFilter);
-  if(riesgosPlanta!=='all') filtered=filtered.filter(r=>r.planta===riesgosPlanta);
+  renderRiesgoCrossFilterNote();
+  const filtered=getFilteredRiesgos();
   if(!filtered.length){body.innerHTML='<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--muted)">Sin datos para este filtro</td></tr>';return;}
   body.innerHTML=filtered.map((r,i)=>{const isCrit=r.riesgo==='critico';const col=isCrit?'#C8001E':'#B8860B';const bp=Math.min((r.alcance/4)*100,100).toFixed(1);
     return `<tr><td style="font-family:var(--cond);font-size:13px;font-weight:800;color:var(--muted2)">${i+1}</td>
@@ -836,7 +872,7 @@ function renderRiesgosTable(){
       <div style="background:var(--gray2);border-radius:3px;height:4px;margin-top:4px"><div style="height:4px;border-radius:3px;width:${bp}%;background:${col}"></div></div>
       <div style="font-size:10px;color:var(--muted);margin-top:2px">${r.cat}</div>
     </td>
-    <td style="font-size:11px;color:var(--muted)">${r.tipo}</td>
+    <td style="font-size:11px;color:var(--muted)">${cpfrLabel(r.tipo)}</td>
     <td><span style="font-size:10px;font-weight:700;background:var(--gray2);padding:2px 8px;border-radius:10px;white-space:nowrap">${r.planta}</span></td>
     <td class="r">
       <div style="font-family:var(--cond);font-size:17px;font-weight:700;color:${r.stock===0?'#C8001E':'var(--dark2)'}">${r.stock.toLocaleString('es-CL',{minimumFractionDigits:0})}</div>

@@ -275,9 +275,10 @@
         <button onclick="exportRiesgosExcel()" title="Incluye estado de riesgo, stock disponible, FCST semanal, alcance, quiebre y merma (cuando el dato existe)" style="font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;border:1.5px solid #1A5276;background:#eaf4fb;color:#1A5276;cursor:pointer">⬇ Descargar Excel</button>
       </div>
     </div>
+    <div id="riesgoCrossFilterNote" style="display:none;font-size:12px;color:var(--muted);margin:-4px 0 12px"></div>
     <div style="overflow-x:auto">
     <table class="tbl" style="min-width:800px">
-      <thead><tr><th>#</th><th>Producto</th><th>Categoría</th><th>Planta</th>
+      <thead><tr><th>#</th><th>Producto</th><th>CPFR</th><th>Planta</th>
         <th class="r">Stock disp (kg)</th><th class="r">FCST sem (kg)</th>
         <th class="r">Alcance (sem)</th><th class="r">Estado</th></tr></thead>
       <tbody id="riesgosBody"></tbody>
