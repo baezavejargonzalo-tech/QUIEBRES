@@ -795,12 +795,15 @@ function renderRiesgoCrossFilterNote(){
   if (currentCategoria !== 'all') activos.push(`Categoría: ${currentCategoria}`);
   if (skuSearch.trim()) activos.push(`Búsqueda: "${skuSearch.trim()}"`);
   if (riesgosPlanta === 'all' && currentPlanta !== 'all') activos.push(`Planta: ${currentPlanta}`);
+
+  let html = '';
   if (activos.length) {
-    el.style.display = '';
-    el.innerHTML = `🔗 También filtrado desde la pestaña Quiebres — ${activos.join(' · ')}. <button onclick="resetFiltros()" style="border:none;background:none;color:var(--red);font-weight:700;font-size:12px;cursor:pointer;padding:0;text-decoration:underline">Quitar</button>`;
-  } else {
-    el.style.display = 'none';
+    html += `🔗 También filtrado desde la pestaña Quiebres — ${activos.join(' · ')}. <button onclick="resetFiltros()" style="border:none;background:none;color:var(--red);font-weight:700;font-size:12px;cursor:pointer;padding:0;text-decoration:underline">Quitar</button>`;
   }
+  if (currentGrupo !== 'all') {
+    html += `${html ? '<br>' : ''}⚠️ El filtro de <b>Grupo (${currentGrupo})</b> no se puede aplicar acá: el archivo de riesgo no trae el grupo de marketing por SKU, solo por planta/categoría — mostrando el total general, sin acotar por grupo.`;
+  }
+  if (html) { el.style.display = ''; el.innerHTML = html; } else { el.style.display = 'none'; }
 }
 
 // ── EXPORTAR TOP 50 A EXCEL (CSV) ──────────────────────────────────────────────
