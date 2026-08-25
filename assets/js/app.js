@@ -776,10 +776,30 @@ const cpfrLabel = tipo => tipo === 'Refrigerados' ? 'Frío' : tipo === 'Abarrote
 // (estado crítico/alerta, planta) MÁS los filtros activos en la pestaña
 // Quiebres (Tipo=CPFR, Categoría, Búsqueda de SKU). La Planta de la pestaña
 // Quiebres se usa solo si no se tocó el filtro de Planta propio de esta tabla.
+//
+// Fuente de datos: sin planta filtrada, se usa RIESGOS (el Top 50 peor-alcance
+// de TODA la compañía). Con una planta filtrada, se usa el detalle propio de
+// esa planta en PLANTAS_RIESGO (refrigerados+abarrotes .productos) — para la
+// mayoría de las plantas es la lista COMPLETA de sus críticos+alertas, no solo
+// los que alcanzaron a entrar al ranking global de 50. Esas filas no traen
+// código de SKU (el archivo no lo guarda a ese nivel), por eso esa columna
+// queda vacía cuando se exportan.
+function effectiveRiesgoPlanta(){
+  return riesgosPlanta !== 'all' ? riesgosPlanta : currentPlanta;
+}
+function getRiesgosPorPlanta(planta){
+  const p = PLANTAS_RIESGO.find(x => x.planta === planta);
+  if (!p) return { rows: [], completo: true, totalPlanta: 0 };
+  const rows = [...(p.refrigerados.productos || []), ...(p.abarrotes.productos || [])]
+    .map(r => ({ ...r, planta, sku: null }))
+    .sort((a, b) => a.alcance - b.alcance);
+  const totalPlanta = p.criticos + p.alertas;
+  return { rows, completo: rows.length >= totalPlanta, totalPlanta };
+}
 function getFilteredRiesgos(){
-  let filtered = riesgosFilter === 'all' ? RIESGOS : RIESGOS.filter(r => r.riesgo === riesgosFilter);
-  const effectivePlanta = riesgosPlanta !== 'all' ? riesgosPlanta : currentPlanta;
-  if (effectivePlanta !== 'all') filtered = filtered.filter(r => r.planta === effectivePlanta);
+  const effectivePlanta = effectiveRiesgoPlanta();
+  let base = effectivePlanta !== 'all' ? getRiesgosPorPlanta(effectivePlanta).rows : RIESGOS;
+  let filtered = riesgosFilter === 'all' ? base : base.filter(r => r.riesgo === riesgosFilter);
   if (currentTipo !== 'all') filtered = filtered.filter(r => r.tipo === currentTipo);
   if (currentCategoria !== 'all') filtered = filtered.filter(r => r.cat === currentCategoria);
   const q = skuSearch.trim().toLowerCase();
@@ -802,6 +822,14 @@ function renderRiesgoCrossFilterNote(){
   }
   if (currentGrupo !== 'all') {
     html += `${html ? '<br>' : ''}⚠️ El filtro de <b>Grupo (${currentGrupo})</b> no se puede aplicar acá: el archivo de riesgo no trae el grupo de marketing por SKU, solo por planta/categoría — mostrando el total general, sin acotar por grupo.`;
+  }
+  const ep = effectiveRiesgoPlanta();
+  if (ep !== 'all') {
+    const { completo, totalPlanta, rows } = getRiesgosPorPlanta(ep);
+    const msg = completo
+      ? `📍 Mostrando el detalle <b>completo</b> de ${ep}: sus ${totalPlanta} SKU en riesgo (crítico + alerta), no solo los que entraron al ranking global de 50.`
+      : `📍 Mostrando hasta 20 SKU por familia (Frío/Seco) con menor alcance en ${ep} — tiene ${totalPlanta} SKU en riesgo en total, se listan ${rows.length} con detalle disponible. Estas filas no traen código de SKU (el archivo no lo guarda a este nivel).`;
+    html += `${html ? '<br>' : ''}${msg}`;
   }
   if (html) { el.style.display = ''; el.innerHTML = html; } else { el.style.display = 'none'; }
 }
@@ -855,8 +883,7 @@ function exportRiesgosExcel(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  const effectivePlanta = riesgosPlanta !== 'all' ? riesgosPlanta : currentPlanta;
-  a.download = `riesgo_quiebre_${riesgosFilter}_${effectivePlanta}_${currentTipo}.csv`;
+  a.download = `riesgo_quiebre_${riesgosFilter}_${effectiveRiesgoPlanta()}_${currentTipo}.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -865,6 +892,11 @@ function exportRiesgosExcel(){
 
 function renderRiesgosTable(){
   const body=document.getElementById('riesgosBody');if(!body)return;
+  const tituloEl=document.getElementById('riesgosTablaTitulo');
+  if(tituloEl){
+    const ep=effectiveRiesgoPlanta();
+    tituloEl.textContent = ep!=='all' ? `📋 Detalle · Planta ${ep}` : '📋 Top 50 · Menor Alcance de Stock';
+  }
   renderRiesgoCrossFilterNote();
   const filtered=getFilteredRiesgos();
   if(!filtered.length){body.innerHTML='<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--muted)">Sin datos para este filtro</td></tr>';return;}
