@@ -274,7 +274,6 @@ function renderKPIs(d) {
 function renderCadenas(d) {
   const cadenasAll  = d.cadenas || [];
   const cadenasView = currentGrupo === 'all' ? cadenasAll : cadenasAll.filter(c => c.n === currentGrupo);
-  const max = cadenasAll.length ? Math.max(...cadenasAll.map(c => c.q)) : 1;
   const totalQ = cadenasAll.reduce((s, c) => s + c.q, 0) || 1;
   const weeks = getSems().map(s => s.s).slice(-8); // últimas semanas disponibles, serie real por grupo
 
@@ -286,49 +285,49 @@ function renderCadenas(d) {
     ? `${fmt(cadenasView[0].q)} ton · ${(cadenasView[0].q/totalQ*100).toFixed(1)}% del total`
     : fmt(d.q) + ' ton total';
 
+  const tonLabelCadenas = currentVista === 'quiebres' ? 'Ton Quebradas'
+                        : currentVista === 'bloqueos' ? 'Ton Bloqueadas' : 'Ton Combinadas';
+
   document.getElementById('cadenasBars').innerHTML = cadenasView.length
-    ? cadenasView.map((c) => {
-        const i = cadenasAll.indexOf(c); // color consistente con el ranking sin filtrar
-        const pctFcst  = c.fcst > 0 ? (c.q/c.fcst*100) : 0;
-        const pctTotal = (c.q/totalQ*100).toFixed(1);
+    ? `<div style="overflow-x:auto"><table class="tbl">
+        <thead><tr>
+          <th>#</th><th>Grupo de Marketing</th>
+          <th class="r">${tonLabelCadenas}</th>
+          <th class="r">% FCST</th>
+          <th class="r">Participación</th>
+          <th class="r">Tendencia</th>
+        </tr></thead>
+        <tbody>
+        ${cadenasView.map((c) => {
+          const i = cadenasAll.indexOf(c); // color consistente con el ranking sin filtrar
+          const pctFcst  = c.fcst > 0 ? (c.q/c.fcst*100) : 0;
+          const pctTotal = (c.q/totalQ*100).toFixed(1);
 
-        // serie semanal real del grupo (no inventada: viene de DB[tipo][semana].cadenas)
-        const serie = weeks.map(w => {
-          const wd = DB[currentTipo] && DB[currentTipo][w];
-          const row = wd && wd.cadenas ? wd.cadenas.find(x => x.n === c.n) : null;
-          return row ? row.q : 0;
-        });
-        const maxS = Math.max(...serie, 1);
-        const spark = serie.map(v => `<div style="flex:1;background:${barCol(i)};opacity:.55;height:${Math.max(v/maxS*100,4).toFixed(0)}%;border-radius:1px"></div>`).join('');
-        const half = Math.floor(serie.length/2) || 1;
-        const prevAvg = serie.slice(0, half).reduce((a,b) => a+b, 0) / half;
-        const lastAvg = serie.slice(half).reduce((a,b) => a+b, 0) / (serie.length - half || 1);
-        const deltaPct = prevAvg > 0 ? ((lastAvg - prevAvg) / prevAvg * 100) : (lastAvg > 0 ? 100 : 0);
-        const up = deltaPct > 3, down = deltaPct < -3;
-        const trendArrow = up ? '▲' : down ? '▼' : '▬';
-        const trendColor = up ? 'var(--red)' : down ? '#1a8a3a' : 'var(--muted)';
+          // serie semanal real del grupo (no inventada: viene de DB[tipo][semana].cadenas)
+          const serie = weeks.map(w => {
+            const wd = DB[currentTipo] && DB[currentTipo][w];
+            const row = wd && wd.cadenas ? wd.cadenas.find(x => x.n === c.n) : null;
+            return row ? row.q : 0;
+          });
+          const half = Math.floor(serie.length/2) || 1;
+          const prevAvg = serie.slice(0, half).reduce((a,b) => a+b, 0) / half;
+          const lastAvg = serie.slice(half).reduce((a,b) => a+b, 0) / (serie.length - half || 1);
+          const deltaPct = prevAvg > 0 ? ((lastAvg - prevAvg) / prevAvg * 100) : (lastAvg > 0 ? 100 : 0);
+          const up = deltaPct > 3, down = deltaPct < -3;
+          const trendArrow = up ? '▲' : down ? '▼' : '▬';
+          const trendColor = up ? 'var(--red)' : down ? '#1a8a3a' : 'var(--muted)';
 
-        return `
-      <div class="hbar" style="align-items:flex-start">
-        <div class="hbar-name" style="min-width:150px;padding-top:2px" title="${c.n}">${c.n}</div>
-        <div style="flex:1;min-width:0">
-          <div class="hbar-track" style="margin-bottom:4px"><div class="hbar-fill" style="width:${(c.q/max*100).toFixed(1)}%;background:${barCol(i)}"></div></div>
-          <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
-            <div style="font-size:10px;color:var(--muted)">Participación: <span style="font-family:var(--cond);font-weight:700;color:var(--dark);font-size:12px">${pctTotal}%</span> del total</div>
-            <div style="display:flex;align-items:center;gap:5px" title="Tendencia — últimas ${serie.length} semanas (${weeks[0] || ''}–${weeks[weeks.length-1] || ''})">
-              <span style="font-family:var(--cond);font-weight:800;color:${trendColor};font-size:12px">${trendArrow} ${Math.abs(deltaPct).toFixed(0)}%</span>
-              <div style="display:flex;align-items:flex-end;gap:1px;height:14px;width:56px">${spark}</div>
-            </div>
-          </div>
-        </div>
-        <div class="hbar-right" style="min-width:88px">
-          <div class="chip ${chipCls(pctFcst)}" style="font-size:13px;padding:3px 9px;font-weight:800">${c.fcst > 0 ? pctFcst.toFixed(1)+'%' : '—'}</div>
-          <div style="font-size:9px;color:var(--muted);margin-top:2px">del FCST</div>
-          <div class="hbar-q" style="font-size:18px;margin-top:6px">${fmt(c.q)}</div>
-          <div class="hbar-unit">ton</div>
-        </div>
-      </div>`;
-      }).join('')
+          return `<tr>
+            <td style="font-family:var(--cond);font-size:14px;font-weight:800;color:var(--muted2)">${i+1}</td>
+            <td style="font-weight:700;color:var(--dark)"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${barCol(i)};margin-right:8px;flex-shrink:0"></span>${c.n}</td>
+            <td class="r"><div class="tbl-q">${fmt(c.q)}</div></td>
+            <td class="r"><span class="chip ${chipCls(pctFcst)}">${c.fcst > 0 ? pctFcst.toFixed(1)+'%' : '—'}</span></td>
+            <td class="r" style="font-family:var(--cond);font-weight:700;font-size:15px;color:var(--dark2)">${pctTotal}%</td>
+            <td class="r" style="font-family:var(--cond);font-weight:800;font-size:15px;color:${trendColor}" title="Tendencia — últimas ${serie.length} semanas (${weeks[0] || ''}–${weeks[weeks.length-1] || ''})">${trendArrow} ${Math.abs(deltaPct).toFixed(0)}%</td>
+          </tr>`;
+        }).join('')}
+        </tbody>
+      </table></div>`
     : `<div class="empty">${currentGrupo !== 'all' ? 'Este grupo no tiene quiebres para este filtro' : 'Sin quiebres para este filtro'}</div>`;
 
   document.getElementById('drillCadena').innerHTML = cadenasView.length
