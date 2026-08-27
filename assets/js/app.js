@@ -824,11 +824,16 @@ function renderRiesgoCrossFilterNote(){
   }
   const ep = effectiveRiesgoPlanta();
   if (ep !== 'all') {
-    const { completo, totalPlanta, rows } = getRiesgosPorPlanta(ep);
-    const msg = completo
-      ? `📍 Mostrando el detalle <b>completo</b> de ${ep}: sus ${totalPlanta} SKU en riesgo (crítico + alerta), no solo los que entraron al ranking global de 50.`
-      : `📍 Mostrando hasta 20 SKU por familia (Frío/Seco) con menor alcance en ${ep} — tiene ${totalPlanta} SKU en riesgo en total, se listan ${rows.length} con detalle disponible. Estas filas no traen código de SKU (el archivo no lo guarda a este nivel).`;
-    html += `${html ? '<br>' : ''}${msg}`;
+    const conocida = PLANTAS_RIESGO.some(p => p.planta === ep);
+    if (!conocida) {
+      html += `${html ? '<br>' : ''}⚠️ <b>${ep}</b> no existe en los datos de riesgo: Quiebres usa Centro de Distribución (LOGISTICO) y Riesgo usa Planta productora (ALCANCE) — son dos formas distintas de agrupar planta, y no siempre coinciden. Prueba con San Bernardo, Lonquén, Osorno o Chillán, que sí existen en ambos.`;
+    } else {
+      const { completo, totalPlanta, rows } = getRiesgosPorPlanta(ep);
+      const msg = completo
+        ? `📍 Mostrando el detalle <b>completo</b> de ${ep}: sus ${totalPlanta} SKU en riesgo (crítico + alerta), no solo los que entraron al ranking global de 50.`
+        : `📍 Mostrando hasta 20 SKU por familia (Frío/Seco) con menor alcance en ${ep} — tiene ${totalPlanta} SKU en riesgo en total, se listan ${rows.length} con detalle disponible. Estas filas no traen código de SKU (el archivo no lo guarda a este nivel).`;
+      html += `${html ? '<br>' : ''}${msg}`;
+    }
   }
   if (html) { el.style.display = ''; el.innerHTML = html; } else { el.style.display = 'none'; }
 }
@@ -850,9 +855,9 @@ function exportRiesgosExcel(){
 
   const headers = ['SKU','Producto','Categoría','Planta','CPFR','Estado riesgo',
     'Stock disponible (kg)','Stock XLIB (kg)','Fecha liberación XLIB','Stock bloqueado (kg)',
-    'FCST semanal (kg)','Alcance (sem)',
+    'Stock tránsito (kg)','FCST semanal (kg)','Alcance (sem)',
     'Quiebre (ton)','Merma - días a vencer','Merma - kg en riesgo','Merma - nivel'];
-  const numCols = [6,7,9,10,11,12,13,14];
+  const numCols = [6,7,9,10,11,12,13,14,15];
 
   const rows = filtered.map(r => {
     const q = quiebreByName[r.n.toUpperCase().trim()];
@@ -860,7 +865,7 @@ function exportRiesgosExcel(){
     return [
       r.sku, r.n, r.cat, r.planta, cpfrLabel(r.tipo),
       r.riesgo === 'critico' ? 'Crítico' : 'Alerta',
-      r.stock, r.stock_xlib || '', r.xlib_fecha || '', r.stock_bloq, r.fcst, r.alcance,
+      r.stock, r.stock_xlib || '', r.xlib_fecha || '', r.stock_bloq, r.stock_transito || '', r.fcst, r.alcance,
       q !== undefined ? q : '',
       m ? m.dias : '',
       m ? m.kilos : '',
@@ -913,6 +918,7 @@ function renderRiesgosTable(){
       <div style="font-family:var(--cond);font-size:17px;font-weight:700;color:${r.stock===0?'#C8001E':'var(--dark2)'}">${r.stock.toLocaleString('es-CL',{minimumFractionDigits:0})}</div>
       ${r.stock_xlib>0?`<div style="font-size:10px;color:#2D5BE3">+${r.stock_xlib.toLocaleString('es-CL',{minimumFractionDigits:0})} xlib${r.xlib_fecha?` · libera ${r.xlib_fecha}`:''}</div>`:''}
       ${r.stock_bloq>0?`<div style="font-size:10px;color:#B8860B">+${r.stock_bloq.toLocaleString('es-CL',{minimumFractionDigits:0})} bloq</div>`:''}
+      ${r.stock_transito>0?`<div style="font-size:10px;color:#7A5AA0">+${r.stock_transito.toLocaleString('es-CL',{minimumFractionDigits:0})} tránsito</div>`:''}
     </td>
     <td class="r"><div style="font-family:var(--cond);font-size:17px;color:var(--dark2)">${r.fcst.toLocaleString('es-CL',{minimumFractionDigits:0})}</div></td>
     <td class="r"><div style="font-family:var(--cond);font-size:22px;font-weight:900;color:${col}">${r.alcance.toFixed(1)}</div><div style="font-size:9px;color:var(--muted)">sem</div></td>
@@ -955,7 +961,7 @@ function renderPlantaContent(){
   const catBars=d.top_cats.length?`<div style="background:#f8faff;border-radius:10px;padding:12px 14px;margin-bottom:12px"><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Categorías críticas</div>${d.top_cats.map((c,i)=>{const col=i===0?'#C8001E':i===1?'#c84000':'#906000';return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><div style="min-width:160px;font-size:11px;font-weight:600">${c.cat}</div><div style="flex:1;background:var(--gray2);border-radius:3px;height:7px"><div style="height:7px;border-radius:3px;width:${(c.n/d.top_cats[0].n*100).toFixed(1)}%;background:${col}"></div></div><div style="font-family:var(--cond);font-size:16px;font-weight:800;color:${col};min-width:25px;text-align:right">${c.n}</div><div style="font-size:9px;color:var(--muted)">SKUs</div></div>`;
   }).join('')}</div>`:'';
   const bR=rows=>rows.map((r,i)=>{const col=r.riesgo==='critico'?'#C8001E':'#B8860B';const bp=Math.min((r.alcance/ma)*100,100).toFixed(1);
-    return `<tr style="${r.stock===0&&r.riesgo==='critico'?'background:rgba(200,0,30,.03)':''}"><td style="font-family:var(--cond);font-size:13px;font-weight:800;color:var(--muted2)">${i+1}</td><td style="font-weight:600;max-width:210px"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r.n}">${r.n}</div><div style="display:flex;align-items:center;gap:4px;margin-top:3px"><div style="flex:1;background:var(--gray2);border-radius:3px;height:4px"><div style="height:4px;border-radius:3px;width:${bp}%;background:${col}"></div></div><span style="font-size:9px;color:var(--muted)">${bp}%</span></div></td><td style="font-size:11px;color:var(--muted)">${r.cat}</td><td class="r">${r.stock===0?'<span style="font-size:11px;font-weight:900;color:#C8001E">SIN STOCK</span>':`<div style="font-family:var(--cond);font-size:17px;font-weight:700;color:var(--dark2)">${r.stock.toLocaleString('es-CL',{minimumFractionDigits:1})}</div><div class="tbl-unit">kg disp</div>`}${r.stock_xlib>0?`<div style="font-size:10px;color:#2D5BE3;font-weight:600">+${r.stock_xlib.toLocaleString('es-CL',{minimumFractionDigits:0})} xlib${r.xlib_fecha?` · libera ${r.xlib_fecha}`:''}</div>`:''}${r.stock_bloq>0?`<div style="font-size:10px;color:#B8860B;font-weight:600">+${r.stock_bloq.toLocaleString('es-CL',{minimumFractionDigits:0})} bloq</div>`:''}</td><td class="r"><div style="font-family:var(--cond);font-size:17px;font-weight:700;color:var(--dark2)">${r.fcst.toLocaleString('es-CL',{minimumFractionDigits:1})}</div><div class="tbl-unit">kg/sem</div></td><td class="r"><div style="font-family:var(--cond);font-size:20px;font-weight:800;color:${col}">${r.alcance.toFixed(2)}</div><div class="tbl-unit">semanas</div></td><td class="r"><span class="chip ${r.riesgo==='critico'?'c-red':'c-amb'}">${r.riesgo==='critico'?'🔴 CRÍTICO':'🟡 ALERTA'}</span></td>${(()=>{const m=MERMAS_YOY[r.sku];if(!m||m.yoy_ytd===null)return'<td class="r" style="color:var(--muted);font-size:11px">—</td>';const v=m.yoy_ytd;const c=v>=0?"#1a8a3a":"#C8001E";const arr=v>=0?"▲":"▼";return `<td class="r"><span style="font-family:var(--cond);font-size:15px;font-weight:800;color:${c}">${arr}${Math.abs(v).toFixed(1)}%</span><div style="font-size:9px;color:var(--muted)">YTD vs 2025</div></td>`;})()} </tr>`;
+    return `<tr style="${r.stock===0&&r.riesgo==='critico'?'background:rgba(200,0,30,.03)':''}"><td style="font-family:var(--cond);font-size:13px;font-weight:800;color:var(--muted2)">${i+1}</td><td style="font-weight:600;max-width:210px"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r.n}">${r.n}</div><div style="display:flex;align-items:center;gap:4px;margin-top:3px"><div style="flex:1;background:var(--gray2);border-radius:3px;height:4px"><div style="height:4px;border-radius:3px;width:${bp}%;background:${col}"></div></div><span style="font-size:9px;color:var(--muted)">${bp}%</span></div></td><td style="font-size:11px;color:var(--muted)">${r.cat}</td><td class="r">${r.stock===0?'<span style="font-size:11px;font-weight:900;color:#C8001E">SIN STOCK</span>':`<div style="font-family:var(--cond);font-size:17px;font-weight:700;color:var(--dark2)">${r.stock.toLocaleString('es-CL',{minimumFractionDigits:1})}</div><div class="tbl-unit">kg disp</div>`}${r.stock_xlib>0?`<div style="font-size:10px;color:#2D5BE3;font-weight:600">+${r.stock_xlib.toLocaleString('es-CL',{minimumFractionDigits:0})} xlib${r.xlib_fecha?` · libera ${r.xlib_fecha}`:''}</div>`:''}${r.stock_bloq>0?`<div style="font-size:10px;color:#B8860B;font-weight:600">+${r.stock_bloq.toLocaleString('es-CL',{minimumFractionDigits:0})} bloq</div>`:''}${r.stock_transito>0?`<div style="font-size:10px;color:#7A5AA0;font-weight:600">+${r.stock_transito.toLocaleString('es-CL',{minimumFractionDigits:0})} tránsito</div>`:''}</td><td class="r"><div style="font-family:var(--cond);font-size:17px;font-weight:700;color:var(--dark2)">${r.fcst.toLocaleString('es-CL',{minimumFractionDigits:1})}</div><div class="tbl-unit">kg/sem</div></td><td class="r"><div style="font-family:var(--cond);font-size:20px;font-weight:800;color:${col}">${r.alcance.toFixed(2)}</div><div class="tbl-unit">semanas</div></td><td class="r"><span class="chip ${r.riesgo==='critico'?'c-red':'c-amb'}">${r.riesgo==='critico'?'🔴 CRÍTICO':'🟡 ALERTA'}</span></td>${(()=>{const m=MERMAS_YOY[r.sku];if(!m||m.yoy_ytd===null)return'<td class="r" style="color:var(--muted);font-size:11px">—</td>';const v=m.yoy_ytd;const c=v>=0?"#1a8a3a":"#C8001E";const arr=v>=0?"▲":"▼";return `<td class="r"><span style="font-family:var(--cond);font-size:15px;font-weight:800;color:${c}">${arr}${Math.abs(v).toFixed(1)}%</span><div style="font-size:9px;color:var(--muted)">YTD vs 2025</div></td>`;})()} </tr>`;
   }).join('');
   const tbl=(rows,titulo,color,cls)=>rows.length?`<div style="margin-bottom:14px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;color:${color};margin-bottom:8px;padding:5px 12px;background:${cls==='c-red'?'#fff0f0':'#fffbf0'};border-radius:8px;display:inline-block">${cls==='c-red'?'🔴':'🟡'} ${titulo} (${rows.length} SKUs)</div><div style="overflow-x:auto"><table class="tbl" style="min-width:720px"><thead><tr><th>#</th><th>Producto</th><th>Categoría</th><th class="r">Stock Disp</th><th class="r">FCST Sem</th><th class="r">Alcance</th><th class="r">Estado</th><th class="r" style="white-space:nowrap">Venta YoY</th></tr></thead><tbody>${bR(rows)}</tbody></table></div></div>`:`<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">✅ Sin ${titulo.toLowerCase()} en ${ta}</div>`;
   const cl=d.productos.filter(r=>r.riesgo==='critico');const al=d.productos.filter(r=>r.riesgo==='alerta');
