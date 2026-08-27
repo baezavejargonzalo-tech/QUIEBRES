@@ -50,8 +50,6 @@ function setVista(vista, btn) {
     el.style.display = isRiesgos ? 'none' : '';
   });
 
-  const filterbar = document.querySelector('.filterbar');
-  if (filterbar) filterbar.style.display = isRiesgos ? 'none' : '';
   const quicknav = document.querySelector('.quicknav');
   if (quicknav) quicknav.style.display = isRiesgos ? 'none' : '';
 
@@ -71,17 +69,21 @@ function setVista(vista, btn) {
   if (isRiesgos) { initRiesgosControls(); renderRiesgos(); } else renderAll();
 }
 
+function renderVistaActual() {
+  if (currentVista === 'riesgos') renderRiesgos(); else renderAll();
+}
+
 function setTipo(tipo, btn) {
   document.querySelectorAll('.tipo-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   currentTipo = tipo;
-  renderAll();
+  renderVistaActual();
 }
 
 function setSemana(sem) {
   currentSem = sem;
   document.getElementById('weekSel').value = sem;
-  renderAll();
+  renderVistaActual();
 }
 
 function toggleHelp() {
@@ -109,7 +111,7 @@ function resetFiltros() {
   if (cSel) cSel.value = 'all';
   const sInput = document.getElementById('skuSearchInput');
   if (sInput) sInput.value = '';
-  if (currentVista === 'riesgos') renderRiesgos(); else renderAll();
+  renderVistaActual();
 }
 
 // ── RENDER PRINCIPAL ───────────────────────────────────────────────────────────
@@ -549,7 +551,7 @@ function setMes(mes) {
       wSel.value = 'all';
     }
   }
-  renderAll();
+  renderVistaActual();
 }
 
 function initPlantaSelect() {
@@ -565,7 +567,7 @@ function initPlantaSelect() {
 }
 function setPlanta(val) {
   currentPlanta = val;
-  renderAll();
+  renderVistaActual();
 }
 
 function initGrupoSelect() {
@@ -581,7 +583,7 @@ function initGrupoSelect() {
 }
 function setGrupo(val) {
   currentGrupo = val;
-  renderAll();
+  renderVistaActual();
 }
 
 function initCategoriaSelect() {
@@ -603,11 +605,11 @@ function initCategoriaSelect() {
 }
 function setCategoria(val) {
   currentCategoria = val;
-  renderAll();
+  renderVistaActual();
 }
 function setSkuSearch(val) {
   skuSearch = val;
-  renderAll();
+  renderVistaActual();
 }
 
 
@@ -771,34 +773,19 @@ function renderCharts(){
 // Frío/Seco que usan los equipos de planificación.
 const cpfrLabel = tipo => tipo === 'Refrigerados' ? 'Frío' : tipo === 'Abarrotes' ? 'Seco' : (tipo || '—');
 
-// Filtro combinado de la tabla Top 50 / export: sus propios controles
-// (estado crítico/alerta, planta) MÁS los filtros activos en la pestaña
-// Quiebres (Tipo=CPFR, Categoría, Búsqueda de SKU). La Planta de la pestaña
-// Quiebres se usa solo si no se tocó el filtro de Planta propio de esta tabla.
-//
-// Fuente de datos: sin planta filtrada, se usa RIESGOS (el Top 50 peor-alcance
-// de TODA la compañía). Con una planta filtrada, se usa el detalle propio de
-// esa planta en PLANTAS_RIESGO (refrigerados+abarrotes .productos) — para la
-// mayoría de las plantas es la lista COMPLETA de sus críticos+alertas, no solo
-// los que alcanzaron a entrar al ranking global de 50. Esas filas no traen
-// código de SKU (el archivo no lo guarda a ese nivel), por eso esa columna
-// queda vacía cuando se exportan.
+// Filtro combinado de la tabla / export: sus propios controles (estado
+// crítico/alerta, planta) MÁS los filtros activos en la pestaña Quiebres
+// (Tipo=CPFR, Categoría, Búsqueda de SKU, Grupo no aplica). La Planta de la
+// pestaña Quiebres se usa solo si no se tocó el filtro de Planta propio de
+// esta tabla. RIESGOS trae el universo completo (no solo un Top 50), ya
+// ordenado por alcance ascendente y, en empate, por FCST semanal descendente.
 function effectiveRiesgoPlanta(){
   return riesgosPlanta !== 'all' ? riesgosPlanta : currentPlanta;
 }
-function getRiesgosPorPlanta(planta){
-  const p = PLANTAS_RIESGO.find(x => x.planta === planta);
-  if (!p) return { rows: [], completo: true, totalPlanta: 0 };
-  const rows = [...(p.refrigerados.productos || []), ...(p.abarrotes.productos || [])]
-    .map(r => ({ ...r, planta, sku: null }))
-    .sort((a, b) => a.alcance - b.alcance);
-  const totalPlanta = p.criticos + p.alertas;
-  return { rows, completo: rows.length >= totalPlanta, totalPlanta };
-}
 function getFilteredRiesgos(){
+  let filtered = riesgosFilter === 'all' ? RIESGOS : RIESGOS.filter(r => r.riesgo === riesgosFilter);
   const effectivePlanta = effectiveRiesgoPlanta();
-  let base = effectivePlanta !== 'all' ? getRiesgosPorPlanta(effectivePlanta).rows : RIESGOS;
-  let filtered = riesgosFilter === 'all' ? base : base.filter(r => r.riesgo === riesgosFilter);
+  if (effectivePlanta !== 'all') filtered = filtered.filter(r => r.planta === effectivePlanta);
   if (currentTipo !== 'all') filtered = filtered.filter(r => r.tipo === currentTipo);
   if (currentCategoria !== 'all') filtered = filtered.filter(r => r.cat === currentCategoria);
   const q = skuSearch.trim().toLowerCase();
@@ -828,11 +815,8 @@ function renderRiesgoCrossFilterNote(){
     if (!conocida) {
       html += `${html ? '<br>' : ''}⚠️ <b>${ep}</b> no existe en los datos de riesgo: Quiebres usa Centro de Distribución (LOGISTICO) y Riesgo usa Planta productora (ALCANCE) — son dos formas distintas de agrupar planta, y no siempre coinciden. Prueba con San Bernardo, Lonquén, Osorno o Chillán, que sí existen en ambos.`;
     } else {
-      const { completo, totalPlanta, rows } = getRiesgosPorPlanta(ep);
-      const msg = completo
-        ? `📍 Mostrando el detalle <b>completo</b> de ${ep}: sus ${totalPlanta} SKU en riesgo (crítico + alerta), no solo los que entraron al ranking global de 50.`
-        : `📍 Mostrando hasta 20 SKU por familia (Frío/Seco) con menor alcance en ${ep} — tiene ${totalPlanta} SKU en riesgo en total, se listan ${rows.length} con detalle disponible. Estas filas no traen código de SKU (el archivo no lo guarda a este nivel).`;
-      html += `${html ? '<br>' : ''}${msg}`;
+      const totalPlanta = RIESGOS.filter(r => r.planta === ep).length;
+      html += `${html ? '<br>' : ''}📍 Mostrando el detalle <b>completo</b> de ${ep}: sus ${totalPlanta} SKU en riesgo (crítico + alerta).`;
     }
   }
   if (html) { el.style.display = ''; el.innerHTML = html; } else { el.style.display = 'none'; }
@@ -898,14 +882,16 @@ function exportRiesgosExcel(){
 function renderRiesgosTable(){
   const body=document.getElementById('riesgosBody');if(!body)return;
   const tituloEl=document.getElementById('riesgosTablaTitulo');
+  const ep=effectiveRiesgoPlanta();
   if(tituloEl){
-    const ep=effectiveRiesgoPlanta();
     tituloEl.textContent = ep!=='all' ? `📋 Detalle · Planta ${ep}` : '📋 Top 50 · Menor Alcance de Stock';
   }
   renderRiesgoCrossFilterNote();
   const filtered=getFilteredRiesgos();
   if(!filtered.length){body.innerHTML='<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--muted)">Sin datos para este filtro</td></tr>';return;}
-  body.innerHTML=filtered.map((r,i)=>{const isCrit=r.riesgo==='critico';const col=isCrit?'#C8001E':'#B8860B';const bp=Math.min((r.alcance/4)*100,100).toFixed(1);
+  const capado = ep==='all' && filtered.length>50;
+  const rows = capado ? filtered.slice(0,50) : filtered;
+  let html=rows.map((r,i)=>{const isCrit=r.riesgo==='critico';const col=isCrit?'#C8001E':'#B8860B';const bp=Math.min((r.alcance/4)*100,100).toFixed(1);
     return `<tr><td style="font-family:var(--cond);font-size:13px;font-weight:800;color:var(--muted2)">${i+1}</td>
     <td style="font-weight:600;max-width:240px">
       <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r.n}">${r.n}</div>
@@ -924,6 +910,10 @@ function renderRiesgosTable(){
     <td class="r"><div style="font-family:var(--cond);font-size:22px;font-weight:900;color:${col}">${r.alcance.toFixed(1)}</div><div style="font-size:9px;color:var(--muted)">sem</div></td>
     <td class="r"><span class="chip ${isCrit?'c-red':'c-amb'}">${isCrit?'🔴 CRÍTICO':'🟡 ALERTA'}</span></td></tr>`;
   }).join('');
+  if(capado){
+    html+=`<tr><td colspan="8" style="text-align:center;padding:10px;font-size:11px;color:var(--muted)">Mostrando 50 de ${filtered.length} SKU en riesgo con este filtro — usa <b>⬇ Descargar Excel</b> para ver el listado completo.</td></tr>`;
+  }
+  body.innerHTML=html;
 }
 function renderPlantaTabs(){
   const tabsEl=document.getElementById('plantaTabs');if(!tabsEl)return;
@@ -961,9 +951,9 @@ function renderPlantaContent(){
   const catBars=d.top_cats.length?`<div style="background:#f8faff;border-radius:10px;padding:12px 14px;margin-bottom:12px"><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Categorías críticas</div>${d.top_cats.map((c,i)=>{const col=i===0?'#C8001E':i===1?'#c84000':'#906000';return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><div style="min-width:160px;font-size:11px;font-weight:600">${c.cat}</div><div style="flex:1;background:var(--gray2);border-radius:3px;height:7px"><div style="height:7px;border-radius:3px;width:${(c.n/d.top_cats[0].n*100).toFixed(1)}%;background:${col}"></div></div><div style="font-family:var(--cond);font-size:16px;font-weight:800;color:${col};min-width:25px;text-align:right">${c.n}</div><div style="font-size:9px;color:var(--muted)">SKUs</div></div>`;
   }).join('')}</div>`:'';
   const bR=rows=>rows.map((r,i)=>{const col=r.riesgo==='critico'?'#C8001E':'#B8860B';const bp=Math.min((r.alcance/ma)*100,100).toFixed(1);
-    return `<tr style="${r.stock===0&&r.riesgo==='critico'?'background:rgba(200,0,30,.03)':''}"><td style="font-family:var(--cond);font-size:13px;font-weight:800;color:var(--muted2)">${i+1}</td><td style="font-weight:600;max-width:210px"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r.n}">${r.n}</div><div style="display:flex;align-items:center;gap:4px;margin-top:3px"><div style="flex:1;background:var(--gray2);border-radius:3px;height:4px"><div style="height:4px;border-radius:3px;width:${bp}%;background:${col}"></div></div><span style="font-size:9px;color:var(--muted)">${bp}%</span></div></td><td style="font-size:11px;color:var(--muted)">${r.cat}</td><td class="r">${r.stock===0?'<span style="font-size:11px;font-weight:900;color:#C8001E">SIN STOCK</span>':`<div style="font-family:var(--cond);font-size:17px;font-weight:700;color:var(--dark2)">${r.stock.toLocaleString('es-CL',{minimumFractionDigits:1})}</div><div class="tbl-unit">kg disp</div>`}${r.stock_xlib>0?`<div style="font-size:10px;color:#2D5BE3;font-weight:600">+${r.stock_xlib.toLocaleString('es-CL',{minimumFractionDigits:0})} xlib${r.xlib_fecha?` · libera ${r.xlib_fecha}`:''}</div>`:''}${r.stock_bloq>0?`<div style="font-size:10px;color:#B8860B;font-weight:600">+${r.stock_bloq.toLocaleString('es-CL',{minimumFractionDigits:0})} bloq</div>`:''}${r.stock_transito>0?`<div style="font-size:10px;color:#7A5AA0;font-weight:600">+${r.stock_transito.toLocaleString('es-CL',{minimumFractionDigits:0})} tránsito</div>`:''}</td><td class="r"><div style="font-family:var(--cond);font-size:17px;font-weight:700;color:var(--dark2)">${r.fcst.toLocaleString('es-CL',{minimumFractionDigits:1})}</div><div class="tbl-unit">kg/sem</div></td><td class="r"><div style="font-family:var(--cond);font-size:20px;font-weight:800;color:${col}">${r.alcance.toFixed(2)}</div><div class="tbl-unit">semanas</div></td><td class="r"><span class="chip ${r.riesgo==='critico'?'c-red':'c-amb'}">${r.riesgo==='critico'?'🔴 CRÍTICO':'🟡 ALERTA'}</span></td>${(()=>{const m=MERMAS_YOY[r.sku];if(!m||m.yoy_ytd===null)return'<td class="r" style="color:var(--muted);font-size:11px">—</td>';const v=m.yoy_ytd;const c=v>=0?"#1a8a3a":"#C8001E";const arr=v>=0?"▲":"▼";return `<td class="r"><span style="font-family:var(--cond);font-size:15px;font-weight:800;color:${c}">${arr}${Math.abs(v).toFixed(1)}%</span><div style="font-size:9px;color:var(--muted)">YTD vs 2025</div></td>`;})()} </tr>`;
+    return `<tr style="${r.stock===0&&r.riesgo==='critico'?'background:rgba(200,0,30,.03)':''}"><td style="font-family:var(--cond);font-size:13px;font-weight:800;color:var(--muted2)">${i+1}</td><td style="font-weight:600;max-width:210px"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r.n}">${r.n}</div><div style="display:flex;align-items:center;gap:4px;margin-top:3px"><div style="flex:1;background:var(--gray2);border-radius:3px;height:4px"><div style="height:4px;border-radius:3px;width:${bp}%;background:${col}"></div></div><span style="font-size:9px;color:var(--muted)">${bp}%</span></div></td><td style="font-size:11px;color:var(--muted)">${r.cat}</td><td class="r">${r.stock===0?'<span style="font-size:11px;font-weight:900;color:#C8001E">SIN STOCK</span>':`<div style="font-family:var(--cond);font-size:17px;font-weight:700;color:var(--dark2)">${r.stock.toLocaleString('es-CL',{minimumFractionDigits:1})}</div><div class="tbl-unit">kg disp</div>`}${r.stock_bloq>0?`<div style="font-size:10px;color:#B8860B;font-weight:600">+${r.stock_bloq.toLocaleString('es-CL',{minimumFractionDigits:0})} bloq</div>`:''}</td><td class="r">${r.stock_xlib>0?`<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#2D5BE3">${r.stock_xlib.toLocaleString('es-CL',{minimumFractionDigits:0})}</div><div class="tbl-unit">kg</div>`:'<span style="color:var(--muted);font-size:11px">—</span>'}</td><td class="r" style="font-size:11px;color:#2D5BE3;white-space:nowrap">${r.xlib_fecha||'<span style="color:var(--muted)">—</span>'}</td><td class="r">${r.stock_transito>0?`<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#7A5AA0">${r.stock_transito.toLocaleString('es-CL',{minimumFractionDigits:0})}</div><div class="tbl-unit">kg</div>`:'<span style="color:var(--muted);font-size:11px">—</span>'}</td><td class="r"><div style="font-family:var(--cond);font-size:17px;font-weight:700;color:var(--dark2)">${r.fcst.toLocaleString('es-CL',{minimumFractionDigits:1})}</div><div class="tbl-unit">kg/sem</div></td><td class="r"><div style="font-family:var(--cond);font-size:20px;font-weight:800;color:${col}">${r.alcance.toFixed(2)}</div><div class="tbl-unit">semanas</div></td><td class="r"><span class="chip ${r.riesgo==='critico'?'c-red':'c-amb'}">${r.riesgo==='critico'?'🔴 CRÍTICO':'🟡 ALERTA'}</span></td>${(()=>{const m=MERMAS_YOY[r.sku];if(!m||m.yoy_ytd===null)return'<td class="r" style="color:var(--muted);font-size:11px">—</td>';const v=m.yoy_ytd;const c=v>=0?"#1a8a3a":"#C8001E";const arr=v>=0?"▲":"▼";return `<td class="r"><span style="font-family:var(--cond);font-size:15px;font-weight:800;color:${c}">${arr}${Math.abs(v).toFixed(1)}%</span><div style="font-size:9px;color:var(--muted)">YTD vs 2025</div></td>`;})()} </tr>`;
   }).join('');
-  const tbl=(rows,titulo,color,cls)=>rows.length?`<div style="margin-bottom:14px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;color:${color};margin-bottom:8px;padding:5px 12px;background:${cls==='c-red'?'#fff0f0':'#fffbf0'};border-radius:8px;display:inline-block">${cls==='c-red'?'🔴':'🟡'} ${titulo} (${rows.length} SKUs)</div><div style="overflow-x:auto"><table class="tbl" style="min-width:720px"><thead><tr><th>#</th><th>Producto</th><th>Categoría</th><th class="r">Stock Disp</th><th class="r">FCST Sem</th><th class="r">Alcance</th><th class="r">Estado</th><th class="r" style="white-space:nowrap">Venta YoY</th></tr></thead><tbody>${bR(rows)}</tbody></table></div></div>`:`<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">✅ Sin ${titulo.toLowerCase()} en ${ta}</div>`;
+  const tbl=(rows,titulo,color,cls)=>rows.length?`<div style="margin-bottom:14px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;color:${color};margin-bottom:8px;padding:5px 12px;background:${cls==='c-red'?'#fff0f0':'#fffbf0'};border-radius:8px;display:inline-block">${cls==='c-red'?'🔴':'🟡'} ${titulo} (${rows.length} SKUs)</div><div style="overflow-x:auto"><table class="tbl" style="min-width:960px"><thead><tr><th>#</th><th>Producto</th><th>Categoría</th><th class="r">Stock Disp</th><th class="r" style="white-space:nowrap">XLIB (kg)</th><th class="r" style="white-space:nowrap">Fecha XLIB</th><th class="r" style="white-space:nowrap">Tránsito (kg)</th><th class="r">FCST Sem</th><th class="r">Alcance</th><th class="r">Estado</th><th class="r" style="white-space:nowrap">Venta YoY</th></tr></thead><tbody>${bR(rows)}</tbody></table></div></div>`:`<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">✅ Sin ${titulo.toLowerCase()} en ${ta}</div>`;
   const cl=d.productos.filter(r=>r.riesgo==='critico');const al=d.productos.filter(r=>r.riesgo==='alerta');
   el.innerHTML=kpis+subTabs+'<div style="padding:0 2px">'+kpisTipo+catBars+tbl(cl,`Críticos — ${cr}`,'#C8001E','c-red')+tbl(al,`Alertas — ${ar}`,'#B8860B','c-amb')+'</div>';
 }
