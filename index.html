@@ -113,21 +113,9 @@
   <!-- ── ¿QUÉ NECESITA ACCIÓN HOY? ── -->
   <div class="panel-title" style="border:none;padding:0;margin-bottom:10px">🎯 ¿Qué necesita acción hoy? <em>de los críticos, con los filtros de arriba</em></div>
   <div id="accionHoy" style="margin-bottom:14px"></div>
-  <div style="font-size:11.5px;color:var(--muted2);margin:-6px 0 16px;padding:0 2px">
-    Los paneles Por Planta / Por Categoría de abajo son totales de toda la compañía — no se acotan con los filtros de arriba, porque vienen pre-sumados sin ese detalle. El bloque de arriba y la tabla <b>Top 50 · Menor Alcance de Stock</b> sí responden a esos filtros (Tipo, Planta, Grupo, Categoría, Búsqueda).
-  </div>
-
-  <!-- ── FILA 2 PANELES ── -->
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px">
-    <div class="panel"><div class="panel-title">Por Planta <em>SKUs en riesgo</em></div><div id="chartPlanta"></div></div>
-    <div class="panel"><div class="panel-title">Por Categoría <em>SKUs en riesgo</em></div><div id="chartCat"></div></div>
-    <div class="panel"><div class="panel-title">Quiebres sem. seleccionada <em id="subcatSemLabel">por subcategoría · ton</em></div><div id="chartSubcat"></div></div>
-  </div>
-
-  <div id="riesgo-quebra-kpis" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px"></div>
 
   <!-- ── TABLA TOP 50 ── -->
-  <div class="panel">
+  <div class="panel" style="margin-bottom:14px">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px">
       <div class="panel-title" style="margin:0" id="riesgosTablaTitulo">📋 Top 50 · Menor Alcance de Stock</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
@@ -141,7 +129,7 @@
     <div id="riesgoCrossFilterNote" style="display:none;font-size:12px;color:var(--muted);margin:-4px 0 12px"></div>
     <div style="overflow-x:auto">
     <table class="tbl" style="min-width:1180px">
-      <thead><tr><th>#</th><th>Producto</th><th>Categoría</th><th>Planta</th>
+      <thead><tr><th>#</th><th>Producto</th><th>Categoría</th><th>CPFR</th>
         <th class="r">Stock Disp</th><th class="r" style="white-space:nowrap">XLIB (kg)</th>
         <th class="r" style="white-space:nowrap">Fecha XLIB</th><th class="r" style="white-space:nowrap">Tránsito (kg)</th>
         <th class="r">FCST Sem</th><th class="r">Alcance</th><th class="r">Estado</th>
@@ -149,7 +137,19 @@
       <tbody id="riesgosBody"></tbody>
     </table></div>
   </div>
+
+  <div style="font-size:11.5px;color:var(--muted2);margin:0 0 16px;padding:0 2px">
+    Los paneles Por Planta / Por Categoría de abajo son totales de toda la compañía — no se acotan con los filtros de arriba, porque vienen pre-sumados sin ese detalle. El bloque <b>¿Qué necesita acción hoy?</b> y la tabla <b>Top 50 · Menor Alcance de Stock</b> sí responden a esos filtros (Tipo, Planta, Grupo, Categoría, Búsqueda).
   </div>
+
+  <!-- ── FILA 2 PANELES ── -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px">
+    <div class="panel"><div class="panel-title">Por Planta <em>SKUs en riesgo</em></div><div id="chartPlanta"></div></div>
+    <div class="panel"><div class="panel-title">Por Categoría <em>SKUs en riesgo</em></div><div id="chartCat"></div></div>
+    <div class="panel"><div class="panel-title">Quiebres sem. seleccionada <em id="subcatSemLabel">por subcategoría · ton</em></div><div id="chartSubcat"></div></div>
+  </div>
+
+  <div id="riesgo-quebra-kpis" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px"></div>
 
   <!-- ══════════════ RAMA 2: RIESGO DE MERMA ══════════════ -->
   <div id="riesgoMermaView" style="display:none">
