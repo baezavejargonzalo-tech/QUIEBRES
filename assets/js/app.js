@@ -1,6 +1,7 @@
 // ── ESTADO ─────────────────────────────────────────────────────────────────────
 let currentTipo = 'all';
 let currentPlanta = 'all';
+let currentGrupo = 'all';
 let currentCategoria = 'all';
 let skuSearch = '';
 
@@ -20,6 +21,10 @@ function setPlanta(val) {
   currentPlanta = val;
   renderRiesgos();
 }
+function setGrupo(val) {
+  currentGrupo = val;
+  renderRiesgos();
+}
 function setCategoria(val) {
   currentCategoria = val;
   renderRiesgos();
@@ -31,11 +36,14 @@ function setSkuSearch(val) {
 function resetFiltros() {
   currentTipo = 'all';
   currentPlanta = 'all';
+  currentGrupo = 'all';
   currentCategoria = 'all';
   skuSearch = '';
   document.querySelectorAll('.filterbar .tipo-btn').forEach((b, i) => b.classList.toggle('active', i === 0));
   const pSel = document.getElementById('plantaSel');
   if (pSel) pSel.value = 'all';
+  const gSel = document.getElementById('grupoSel');
+  if (gSel) gSel.value = 'all';
   const cSel = document.getElementById('categoriaSel');
   if (cSel) cSel.value = 'all';
   const sInput = document.getElementById('skuSearchInput');
@@ -52,6 +60,17 @@ function initPlantaSelect() {
     o.value = p; o.textContent = p;
     sel.appendChild(o);
   });
+}
+function initGrupoSelect() {
+  const sel = document.getElementById('grupoSel');
+  if (!sel || sel.options.length > 1) return;
+  const grupos = [...new Set(RIESGOS.map(r => r.grupo))].filter(Boolean).sort();
+  grupos.forEach(g => {
+    const o = document.createElement('option');
+    o.value = g; o.textContent = g;
+    sel.appendChild(o);
+  });
+  sel.title = `Filtrar por grupo de marketing — cruzado por SKU con LOGISTICO: ${GRUPO_COVERAGE.con_grupo} de ${GRUPO_COVERAGE.total} SKU en riesgo tienen grupo asignado`;
 }
 function initCategoriaSelect() {
   const sel = document.getElementById('categoriaSel');
@@ -206,17 +225,31 @@ function renderCharts() {
 // Frío/Seco que usan los equipos de planificación.
 const cpfrLabel = tipo => tipo === 'Refrigerados' ? 'Frío' : tipo === 'Abarrotes' ? 'Seco' : (tipo || '—');
 
-// Filtro combinado de la tabla / export: Tipo (CPFR), Planta, Categoría y
-// Búsqueda de SKU, todos sobre el universo completo de RIESGOS (ya ordenado
-// por alcance ascendente y, en empate, por FCST semanal descendente).
-function getFilteredRiesgos() {
-  let filtered = riesgosFilter === 'all' ? RIESGOS : RIESGOS.filter(r => r.riesgo === riesgosFilter);
+// Filtro combinado de la tabla / export: Tipo (CPFR), Planta, Grupo de
+// Marketing, Categoría y Búsqueda de SKU — aplicado sobre cualquier subset
+// de RIESGOS (ya viene ordenado por alcance ascendente y, en empate, por
+// FCST semanal descendente).
+function filterRiesgosBase(list) {
+  let filtered = list;
   if (currentPlanta !== 'all') filtered = filtered.filter(r => r.planta === currentPlanta);
   if (currentTipo !== 'all') filtered = filtered.filter(r => r.tipo === currentTipo);
+  if (currentGrupo !== 'all') filtered = filtered.filter(r => r.grupo === currentGrupo);
   if (currentCategoria !== 'all') filtered = filtered.filter(r => r.cat === currentCategoria);
   const q = skuSearch.trim().toLowerCase();
   if (q) filtered = filtered.filter(r => r.n.toLowerCase().includes(q));
   return filtered;
+}
+function getFilteredRiesgos() {
+  return filterRiesgosBase(riesgosFilter === 'all' ? RIESGOS : RIESGOS.filter(r => r.riesgo === riesgosFilter));
+}
+// SKU crítico "estancado": sin XLIB ni tránsito en camino — no tiene fecha
+// de recuperación conocida, no se va a resolver solo. Respeta los mismos
+// filtros que la tabla Top 50.
+function getCriticosFiltrados() {
+  return filterRiesgosBase(RIESGOS.filter(r => r.riesgo === 'critico'));
+}
+function getEstancados() {
+  return getCriticosFiltrados().filter(r => !(r.stock_xlib > 0 || r.stock_transito > 0));
 }
 
 function renderRiesgoCrossFilterNote() {
@@ -225,6 +258,7 @@ function renderRiesgoCrossFilterNote() {
   const activos = [];
   if (currentTipo !== 'all') activos.push(`CPFR: ${cpfrLabel(currentTipo)}`);
   if (currentPlanta !== 'all') activos.push(`Planta: ${currentPlanta}`);
+  if (currentGrupo !== 'all') activos.push(`Grupo: ${currentGrupo}`);
   if (currentCategoria !== 'all') activos.push(`Categoría: ${currentCategoria}`);
   if (skuSearch.trim()) activos.push(`Búsqueda: "${skuSearch.trim()}"`);
 
@@ -232,11 +266,82 @@ function renderRiesgoCrossFilterNote() {
   if (activos.length) {
     html += `🔗 Filtros activos — ${activos.join(' · ')}. <button onclick="resetFiltros()" style="border:none;background:none;color:var(--red);font-weight:700;font-size:12px;cursor:pointer;padding:0;text-decoration:underline">Quitar</button>`;
   }
+  if (currentGrupo !== 'all') {
+    html += `${html ? '<br>' : ''}ℹ️ El Grupo de Marketing se cruza por código de SKU con el historial de quiebres (LOGISTICO) — solo ${GRUPO_COVERAGE.con_grupo} de los ${GRUPO_COVERAGE.total} SKU en riesgo tienen grupo asignado; los que no tienen pedidos recientes no aparecen al filtrar por grupo.`;
+  }
   if (currentPlanta !== 'all') {
     const totalPlanta = RIESGOS.filter(r => r.planta === currentPlanta).length;
     html += `${html ? '<br>' : ''}📍 Mostrando el detalle <b>completo</b> de ${currentPlanta}: sus ${totalPlanta} SKU en riesgo (crítico + alerta).`;
   }
   if (html) { el.style.display = ''; el.innerHTML = html; } else { el.style.display = 'none'; }
+}
+
+// ── ¿QUÉ NECESITA ACCIÓN HOY? ──────────────────────────────────────────────────
+// De los críticos filtrados: separa los que ya tienen stock en camino (XLIB o
+// tránsito) de los que están estancados sin ninguna fecha de recuperación a
+// la vista, y lista los 10 estancados con menor alcance para actuar primero.
+function renderAccionHoy() {
+  const el = document.getElementById('accionHoy');
+  if (!el) return;
+  const criticosF = getCriticosFiltrados();
+  const estancados = getEstancados();
+  const enCamino = criticosF.length - estancados.length;
+  const totalF = criticosF.length;
+  const pctEst = totalF > 0 ? Math.round(estancados.length / totalF * 100) : 0;
+  const pctCam = totalF > 0 ? 100 - pctEst : 0;
+
+  const cardsHtml = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;height:100%">
+      <div style="background:#fff0f0;border:2px solid #ffb3b3;border-radius:16px;padding:20px 22px;position:relative;overflow:hidden;display:flex;flex-direction:column;gap:6px">
+        <div style="position:absolute;top:0;left:0;right:0;height:4px;background:#C8001E"></div>
+        <div style="display:flex;align-items:baseline;gap:10px">
+          <div style="font-size:48px;line-height:1;font-family:var(--cond);font-weight:900;color:#C8001E">${estancados.length}</div>
+          ${totalF > 0 ? `<div style="font-family:var(--cond);font-size:15px;font-weight:800;color:#C8001E">${pctEst}%</div>` : ''}
+        </div>
+        <div style="font-size:12px;font-weight:800;color:#C8001E;text-transform:uppercase;letter-spacing:.5px">🚨 Estancados — actuar hoy</div>
+        <div style="font-size:11px;color:var(--muted);line-height:1.4">Sin XLIB ni tránsito en camino. No se resuelven solos.</div>
+      </div>
+      <div style="background:#f0faf3;border:2px solid #b8e6c8;border-radius:16px;padding:20px 22px;position:relative;overflow:hidden;display:flex;flex-direction:column;gap:6px">
+        <div style="position:absolute;top:0;left:0;right:0;height:4px;background:#1a8a3a"></div>
+        <div style="display:flex;align-items:baseline;gap:10px">
+          <div style="font-size:48px;line-height:1;font-family:var(--cond);font-weight:900;color:#1a8a3a">${enCamino}</div>
+          ${totalF > 0 ? `<div style="font-family:var(--cond);font-size:15px;font-weight:800;color:#1a8a3a">${pctCam}%</div>` : ''}
+        </div>
+        <div style="font-size:12px;font-weight:800;color:#1a8a3a;text-transform:uppercase;letter-spacing:.5px">🚚 Ya en camino</div>
+        <div style="font-size:11px;color:var(--muted);line-height:1.4">Tienen XLIB o tránsito asignado — solo hay que confirmar fecha.</div>
+      </div>
+    </div>`;
+
+  const top10 = estancados.slice(0, 10);
+  const listHtml = top10.length ? `
+    <div style="overflow-x:auto">
+    <table class="tbl">
+      <thead><tr><th>#</th><th>Producto</th><th>Planta</th><th class="r">Alcance</th><th class="r">FCST sem</th></tr></thead>
+      <tbody>
+      ${top10.map((r, i) => `<tr>
+        <td style="font-family:var(--cond);font-size:13px;font-weight:800;color:var(--muted2)">${i + 1}</td>
+        <td style="font-weight:600;max-width:220px">
+          <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r.n}">${r.n}</div>
+          <div style="font-size:10px;color:var(--muted)">${r.cat}${r.grupo ? ' · ' + r.grupo : ''}</div>
+        </td>
+        <td><span style="font-size:10px;font-weight:700;background:var(--gray2);padding:2px 8px;border-radius:10px;white-space:nowrap">${r.planta}</span></td>
+        <td class="r"><span style="font-family:var(--cond);font-size:18px;font-weight:900;color:#C8001E">${r.alcance.toFixed(1)}</span><div style="font-size:9px;color:var(--muted)">sem</div></td>
+        <td class="r"><span style="font-family:var(--cond);font-size:15px;color:var(--dark2)">${r.fcst.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</span></td>
+      </tr>`).join('')}
+      </tbody>
+    </table>
+    </div>
+    ${estancados.length > 10 ? `<div style="text-align:center;padding:8px 0 0;font-size:11px;color:var(--muted)">Mostrando 10 de ${estancados.length} — usa los filtros de arriba para acotar, o descarga el Excel (Top 50) para ver el resto.</div>` : ''}
+  ` : `<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">✅ Ningún SKU crítico está estancado con este filtro</div>`;
+
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1.3fr;gap:14px;align-items:stretch">
+      <div>${cardsHtml}</div>
+      <div class="panel" style="padding:16px 18px;margin:0">
+        <div class="panel-title" style="margin-bottom:10px">🚨 Top 10 · Críticos sin fecha de recuperación</div>
+        ${listHtml}
+      </div>
+    </div>`;
 }
 
 // ── EXPORTAR TOP 50 A EXCEL (CSV) ──────────────────────────────────────────────
@@ -254,17 +359,17 @@ function exportRiesgosExcel() {
   const mermaBySku = {};
   (MERMA_VENC || []).forEach(m => { mermaBySku[m.sku] = m; });
 
-  const headers = ['SKU', 'Producto', 'Categoría', 'Planta', 'CPFR', 'Estado riesgo',
+  const headers = ['SKU', 'Producto', 'Categoría', 'Planta', 'Grupo de Marketing', 'CPFR', 'Estado riesgo',
     'Stock disponible (kg)', 'Stock XLIB (kg)', 'Fecha liberación XLIB', 'Stock bloqueado (kg)',
     'Stock tránsito (kg)', 'FCST semanal (kg)', 'Alcance (sem)',
     'Quiebre (ton)', 'Merma - días a vencer', 'Merma - kg en riesgo', 'Merma - nivel'];
-  const numCols = [6, 7, 9, 10, 11, 12, 13, 14, 15];
+  const numCols = [7, 8, 10, 11, 12, 13, 14, 15, 16];
 
   const rows = filtered.map(r => {
     const q = quiebreByName[r.n.toUpperCase().trim()];
     const m = mermaBySku[r.sku];
     return [
-      r.sku, r.n, r.cat, r.planta, cpfrLabel(r.tipo),
+      r.sku, r.n, r.cat, r.planta, r.grupo || '', cpfrLabel(r.tipo),
       r.riesgo === 'critico' ? 'Crítico' : 'Alerta',
       r.stock, r.stock_xlib || '', r.xlib_fecha || '', r.stock_bloq, r.stock_transito || '', r.fcst, r.alcance,
       q !== undefined ? q : '',
@@ -307,16 +412,16 @@ function exportPlantaTablaExcel(riesgoTipo) {
   const rows = d.productos.filter(r => r.riesgo === riesgoTipo);
   if (!rows.length) { alert('No hay filas para exportar en esta tabla.'); return; }
 
-  const headers = ['SKU', 'Producto', 'Categoría', 'Planta', 'CPFR', 'Estado riesgo',
+  const headers = ['SKU', 'Producto', 'Categoría', 'Planta', 'Grupo de Marketing', 'CPFR', 'Estado riesgo',
     'Stock disponible (kg)', 'Stock bloqueado (kg)', 'Stock XLIB (kg)', 'Fecha liberación XLIB',
     'Stock tránsito (kg)', 'FCST semanal (kg)', 'Alcance (sem)', 'Venta YoY (%)'];
-  const numCols = [6, 7, 8, 10, 11, 12, 13];
+  const numCols = [7, 8, 9, 11, 12, 13, 14];
 
   const dataRows = rows.map(r => {
     const m = MERMAS_YOY[r.sku];
     const yoy = (m && m.yoy_ytd !== null && m.yoy_ytd !== undefined) ? m.yoy_ytd : '';
     return [
-      r.sku, r.n, r.cat, plantaActiva, cpfrLabel(r.tipo),
+      r.sku, r.n, r.cat, plantaActiva, r.grupo || '', cpfrLabel(r.tipo),
       r.riesgo === 'critico' ? 'Crítico' : 'Alerta',
       r.stock, r.stock_bloq, r.stock_xlib || '', r.xlib_fecha || '',
       r.stock_transito || '', r.fcst, r.alcance, yoy
@@ -507,6 +612,7 @@ function renderRiesgoMermaKpis() {
 
 function renderRiesgos() {
   renderCharts();
+  renderAccionHoy();
   renderRiesgosQuebraKPIs();
   renderRiesgosSubcat();
   renderRiesgosTable();
@@ -535,6 +641,7 @@ function initRiesgosControls() {
 
 // ── INICIO ────────────────────────────────────────────────────────────────────
 initPlantaSelect();
+initGrupoSelect();
 initCategoriaSelect();
 initRiesgosControls();
 renderRiesgos();
