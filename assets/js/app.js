@@ -879,6 +879,55 @@ function exportRiesgosExcel(){
   URL.revokeObjectURL(url);
 }
 
+// Exporta exactamente la tabla Críticos/Alertas que se ve en el Desglose por
+// Planta (planta + familia Frío/Seco activas), con las mismas columnas en
+// pantalla: XLIB, fecha XLIB, tránsito y venta YoY (cuando el dato existe).
+function exportPlantaTablaExcel(riesgoTipo){
+  const p = PLANTAS_RIESGO.find(x => x.planta === plantaActiva);
+  if (!p) return;
+  const ta = window._tipoActivo || 'Refrigerados';
+  const d = ta === 'Refrigerados' ? p.refrigerados : p.abarrotes;
+  const rows = d.productos.filter(r => r.riesgo === riesgoTipo);
+  if (!rows.length) { alert('No hay filas para exportar en esta tabla.'); return; }
+
+  const headers = ['SKU','Producto','Categoría','Planta','CPFR','Estado riesgo',
+    'Stock disponible (kg)','Stock bloqueado (kg)','Stock XLIB (kg)','Fecha liberación XLIB',
+    'Stock tránsito (kg)','FCST semanal (kg)','Alcance (sem)','Venta YoY (%)'];
+  const numCols = [6,7,8,10,11,12,13];
+
+  const dataRows = rows.map(r => {
+    const m = MERMAS_YOY[r.sku];
+    const yoy = (m && m.yoy_ytd !== null && m.yoy_ytd !== undefined) ? m.yoy_ytd : '';
+    return [
+      r.sku, r.n, r.cat, plantaActiva, cpfrLabel(r.tipo),
+      r.riesgo === 'critico' ? 'Crítico' : 'Alerta',
+      r.stock, r.stock_bloq, r.stock_xlib || '', r.xlib_fecha || '',
+      r.stock_transito || '', r.fcst, r.alcance, yoy
+    ];
+  });
+
+  const escCsv = v => {
+    if (v === null || v === undefined || v === '') return '';
+    const s = String(v).replace(/"/g, '""');
+    return /[;"\n]/.test(s) ? `"${s}"` : s;
+  };
+  const cellCsv = (v, i) => numCols.includes(i) && typeof v === 'number' ? String(v).replace('.', ',') : escCsv(v);
+
+  const lines = [headers.map(escCsv).join(';')];
+  dataRows.forEach(row => lines.push(row.map(cellCsv).join(';')));
+
+  const csv = '﻿' + lines.join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `riesgo_${riesgoTipo}_${plantaActiva}_${ta}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 function renderRiesgosTable(){
   const body=document.getElementById('riesgosBody');if(!body)return;
   const tituloEl=document.getElementById('riesgosTablaTitulo');
@@ -953,9 +1002,9 @@ function renderPlantaContent(){
   const bR=rows=>rows.map((r,i)=>{const col=r.riesgo==='critico'?'#C8001E':'#B8860B';const bp=Math.min((r.alcance/ma)*100,100).toFixed(1);
     return `<tr style="${r.stock===0&&r.riesgo==='critico'?'background:rgba(200,0,30,.03)':''}"><td style="font-family:var(--cond);font-size:13px;font-weight:800;color:var(--muted2)">${i+1}</td><td style="font-weight:600;max-width:210px"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r.n}">${r.n}</div><div style="display:flex;align-items:center;gap:4px;margin-top:3px"><div style="flex:1;background:var(--gray2);border-radius:3px;height:4px"><div style="height:4px;border-radius:3px;width:${bp}%;background:${col}"></div></div><span style="font-size:9px;color:var(--muted)">${bp}%</span></div></td><td style="font-size:11px;color:var(--muted)">${r.cat}</td><td class="r">${r.stock===0?'<span style="font-size:11px;font-weight:900;color:#C8001E">SIN STOCK</span>':`<div style="font-family:var(--cond);font-size:17px;font-weight:700;color:var(--dark2)">${r.stock.toLocaleString('es-CL',{minimumFractionDigits:1})}</div><div class="tbl-unit">kg disp</div>`}${r.stock_bloq>0?`<div style="font-size:10px;color:#B8860B;font-weight:600">+${r.stock_bloq.toLocaleString('es-CL',{minimumFractionDigits:0})} bloq</div>`:''}</td><td class="r">${r.stock_xlib>0?`<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#2D5BE3">${r.stock_xlib.toLocaleString('es-CL',{minimumFractionDigits:0})}</div><div class="tbl-unit">kg</div>`:'<span style="color:var(--muted);font-size:11px">—</span>'}</td><td class="r" style="font-size:11px;color:#2D5BE3;white-space:nowrap">${r.xlib_fecha||'<span style="color:var(--muted)">—</span>'}</td><td class="r">${r.stock_transito>0?`<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#7A5AA0">${r.stock_transito.toLocaleString('es-CL',{minimumFractionDigits:0})}</div><div class="tbl-unit">kg</div>`:'<span style="color:var(--muted);font-size:11px">—</span>'}</td><td class="r"><div style="font-family:var(--cond);font-size:17px;font-weight:700;color:var(--dark2)">${r.fcst.toLocaleString('es-CL',{minimumFractionDigits:1})}</div><div class="tbl-unit">kg/sem</div></td><td class="r"><div style="font-family:var(--cond);font-size:20px;font-weight:800;color:${col}">${r.alcance.toFixed(2)}</div><div class="tbl-unit">semanas</div></td><td class="r"><span class="chip ${r.riesgo==='critico'?'c-red':'c-amb'}">${r.riesgo==='critico'?'🔴 CRÍTICO':'🟡 ALERTA'}</span></td>${(()=>{const m=MERMAS_YOY[r.sku];if(!m||m.yoy_ytd===null)return'<td class="r" style="color:var(--muted);font-size:11px">—</td>';const v=m.yoy_ytd;const c=v>=0?"#1a8a3a":"#C8001E";const arr=v>=0?"▲":"▼";return `<td class="r"><span style="font-family:var(--cond);font-size:15px;font-weight:800;color:${c}">${arr}${Math.abs(v).toFixed(1)}%</span><div style="font-size:9px;color:var(--muted)">YTD vs 2025</div></td>`;})()} </tr>`;
   }).join('');
-  const tbl=(rows,titulo,color,cls)=>rows.length?`<div style="margin-bottom:14px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;color:${color};margin-bottom:8px;padding:5px 12px;background:${cls==='c-red'?'#fff0f0':'#fffbf0'};border-radius:8px;display:inline-block">${cls==='c-red'?'🔴':'🟡'} ${titulo} (${rows.length} SKUs)</div><div style="overflow-x:auto"><table class="tbl" style="min-width:960px"><thead><tr><th>#</th><th>Producto</th><th>Categoría</th><th class="r">Stock Disp</th><th class="r" style="white-space:nowrap">XLIB (kg)</th><th class="r" style="white-space:nowrap">Fecha XLIB</th><th class="r" style="white-space:nowrap">Tránsito (kg)</th><th class="r">FCST Sem</th><th class="r">Alcance</th><th class="r">Estado</th><th class="r" style="white-space:nowrap">Venta YoY</th></tr></thead><tbody>${bR(rows)}</tbody></table></div></div>`:`<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">✅ Sin ${titulo.toLowerCase()} en ${ta}</div>`;
+  const tbl=(rows,titulo,color,cls,riesgoTipo)=>rows.length?`<div style="margin-bottom:14px"><div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;color:${color};padding:5px 12px;background:${cls==='c-red'?'#fff0f0':'#fffbf0'};border-radius:8px;display:inline-block">${cls==='c-red'?'🔴':'🟡'} ${titulo} (${rows.length} SKUs)</div><button onclick="exportPlantaTablaExcel('${riesgoTipo}')" title="Descarga esta tabla (${titulo}) con XLIB, tránsito, fecha XLIB y venta YoY" style="font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;border:1.5px solid #1A5276;background:#eaf4fb;color:#1A5276;cursor:pointer;white-space:nowrap">⬇ Descargar Excel</button></div><div style="overflow-x:auto"><table class="tbl" style="min-width:960px"><thead><tr><th>#</th><th>Producto</th><th>Categoría</th><th class="r">Stock Disp</th><th class="r" style="white-space:nowrap">XLIB (kg)</th><th class="r" style="white-space:nowrap">Fecha XLIB</th><th class="r" style="white-space:nowrap">Tránsito (kg)</th><th class="r">FCST Sem</th><th class="r">Alcance</th><th class="r">Estado</th><th class="r" style="white-space:nowrap">Venta YoY</th></tr></thead><tbody>${bR(rows)}</tbody></table></div></div>`:`<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">✅ Sin ${titulo.toLowerCase()} en ${ta}</div>`;
   const cl=d.productos.filter(r=>r.riesgo==='critico');const al=d.productos.filter(r=>r.riesgo==='alerta');
-  el.innerHTML=kpis+subTabs+'<div style="padding:0 2px">'+kpisTipo+catBars+tbl(cl,`Críticos — ${cr}`,'#C8001E','c-red')+tbl(al,`Alertas — ${ar}`,'#B8860B','c-amb')+'</div>';
+  el.innerHTML=kpis+subTabs+'<div style="padding:0 2px">'+kpisTipo+catBars+tbl(cl,`Críticos — ${cr}`,'#C8001E','c-red','critico')+tbl(al,`Alertas — ${ar}`,'#B8860B','c-amb','alerta')+'</div>';
 }
 
 function renderMermaVenc(filtroPlanta){
