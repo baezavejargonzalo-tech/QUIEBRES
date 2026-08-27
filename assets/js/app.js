@@ -324,9 +324,9 @@ function exportRiesgosExcel() {
 
   const headers = ['SKU', 'Producto', 'Categoría', 'Planta', 'Grupo de Marketing', 'CPFR', 'Estado riesgo',
     'Stock disponible (kg)', 'Stock XLIB (kg)', 'Fecha liberación XLIB', 'Stock bloqueado (kg)',
-    'Stock tránsito (kg)', 'FCST semanal (kg)', 'Alcance (sem)',
+    'Stock tránsito (kg)', 'Devoluciones (ton)', 'FCST semanal (kg)', 'Alcance (sem)',
     'Quiebre (ton)', 'Merma - días a vencer', 'Merma - kg en riesgo', 'Merma - nivel'];
-  const numCols = [7, 8, 10, 11, 12, 13, 14, 15, 16];
+  const numCols = [7, 8, 10, 11, 12, 13, 14, 15, 16, 17];
 
   const rows = filtered.map(r => {
     const q = quiebreByName[r.n.toUpperCase().trim()];
@@ -334,7 +334,7 @@ function exportRiesgosExcel() {
     return [
       r.sku, r.n, r.cat, r.planta, r.grupo || '', cpfrLabel(r.tipo),
       r.riesgo === 'critico' ? 'Crítico' : 'Alerta',
-      r.stock, r.stock_xlib || '', r.xlib_fecha || '', r.stock_bloq, r.stock_transito || '', r.fcst, r.alcance,
+      r.stock, r.stock_xlib || '', r.xlib_fecha || '', r.stock_bloq, r.stock_transito || '', r.devolucion || '', r.fcst, r.alcance,
       q !== undefined ? q : '',
       m ? m.dias : '',
       m ? m.kilos : '',
@@ -373,7 +373,7 @@ function renderRiesgosTable() {
   }
   renderRiesgoCrossFilterNote();
   const filtered = getFilteredRiesgos();
-  if (!filtered.length) { body.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:2rem;color:var(--muted)">Sin datos para este filtro</td></tr>'; return; }
+  if (!filtered.length) { body.innerHTML = '<tr><td colspan="13" style="text-align:center;padding:2rem;color:var(--muted)">Sin datos para este filtro</td></tr>'; return; }
   const capado = ep === 'all' && filtered.length > 50;
   const rows = capado ? filtered.slice(0, 50) : filtered;
   let html = rows.map((r, i) => {
@@ -385,17 +385,18 @@ function renderRiesgosTable() {
     </td>
     <td style="font-size:11px;color:var(--muted)">${r.cat}</td>
     <td style="font-size:11px;color:var(--muted)">${cpfrLabel(r.tipo)}</td>
-    <td class="r">${r.stock === 0 ? '<span style="font-size:11px;font-weight:900;color:#C8001E">SIN STOCK</span>' : `<div style="font-family:var(--cond);font-size:17px;font-weight:700;color:var(--dark2)">${r.stock.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</div><div class="tbl-unit">kg disp</div>`}${r.stock_bloq > 0 ? `<div style="font-size:10px;color:#B8860B;font-weight:600">+${r.stock_bloq.toLocaleString('es-CL', { minimumFractionDigits: 0 })} bloq</div>` : ''}</td>
+    <td class="r">${r.stock === 0 ? '<span style="font-size:11px;font-weight:900;color:#C8001E">SIN STOCK</span>' : `<div style="font-family:var(--cond);font-size:17px;font-weight:700;color:var(--dark2)">${r.stock.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</div><div class="tbl-unit">kg disp</div>`}</td>
+    <td class="r">${r.stock_bloq > 0 ? `<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#B8860B">${r.stock_bloq.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</div><div class="tbl-unit">kg</div>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
     <td class="r">${r.stock_xlib > 0 ? `<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#2D5BE3">${r.stock_xlib.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</div><div class="tbl-unit">kg</div>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
     <td class="r" style="font-size:11px;color:#2D5BE3;white-space:nowrap">${r.xlib_fecha || '<span style="color:var(--muted)">—</span>'}</td>
     <td class="r">${r.stock_transito > 0 ? `<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#7A5AA0">${r.stock_transito.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</div><div class="tbl-unit">kg</div>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
+    <td class="r">${r.devolucion > 0 ? `<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#a03050">${r.devolucion.toLocaleString('es-CL', { minimumFractionDigits: 2 })}</div><div class="tbl-unit">ton</div>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
     <td class="r"><div style="font-family:var(--cond);font-size:17px;color:var(--dark2)">${r.fcst.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</div></td>
     <td class="r"><div style="font-family:var(--cond);font-size:22px;font-weight:900;color:${col}">${r.alcance.toFixed(1)}</div><div style="font-size:9px;color:var(--muted)">sem</div></td>
-    <td class="r"><span class="chip ${isCrit ? 'c-red' : 'c-amb'}">${isCrit ? '🔴 CRÍTICO' : '🟡 ALERTA'}</span></td>
-    ${(() => { const m = MERMAS_YOY[r.sku]; if (!m || m.yoy_ytd === null || m.yoy_ytd === undefined) return '<td class="r" style="color:var(--muted);font-size:11px">—</td>'; const v = m.yoy_ytd; const c = v >= 0 ? "#1a8a3a" : "#C8001E"; const arr = v >= 0 ? "▲" : "▼"; return `<td class="r"><span style="font-family:var(--cond);font-size:15px;font-weight:800;color:${c}">${arr}${Math.abs(v).toFixed(1)}%</span></td>`; })()}</tr>`;
+    <td class="r"><span class="chip ${isCrit ? 'c-red' : 'c-amb'}">${isCrit ? '🔴 CRÍTICO' : '🟡 ALERTA'}</span></td></tr>`;
   }).join('');
   if (capado) {
-    html += `<tr><td colspan="12" style="text-align:center;padding:10px;font-size:11px;color:var(--muted)">Mostrando 50 de ${filtered.length} SKU en riesgo con este filtro — usa <b>⬇ Descargar Excel</b> para ver el listado completo.</td></tr>`;
+    html += `<tr><td colspan="13" style="text-align:center;padding:10px;font-size:11px;color:var(--muted)">Mostrando 50 de ${filtered.length} SKU en riesgo con este filtro — usa <b>⬇ Descargar Excel</b> para ver el listado completo.</td></tr>`;
   }
   body.innerHTML = html;
 }
