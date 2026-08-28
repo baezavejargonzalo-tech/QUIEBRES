@@ -299,14 +299,13 @@ function renderAccionHoy() {
   });
   const totalMostrados = porGrupo.reduce((acc, x) => acc + x.items.length, 0);
   const hayMasPorGrupo = porGrupo.some(x => x.total > 3);
+  const itemsFlat = porGrupo.flatMap(x => x.items);
   const listHtml = totalMostrados ? `
     <div style="overflow-x:auto">
     <table class="tbl">
       <thead><tr><th>#</th><th>Producto</th><th>Planta</th><th class="r">Alcance</th><th class="r">FCST sem</th></tr></thead>
       <tbody>
-      ${porGrupo.map(({ g, items }) => `
-        <tr><td colspan="5" style="background:var(--gray2);font-size:10.5px;font-weight:800;color:var(--dark2);text-transform:uppercase;letter-spacing:.4px;padding:6px 10px">${g}</td></tr>
-        ${items.length ? items.map((r, i) => `<tr>
+      ${itemsFlat.map((r, i) => `<tr>
         <td style="font-family:var(--cond);font-size:13px;font-weight:800;color:var(--muted2)">${i + 1}</td>
         <td style="font-weight:600;max-width:220px">
           <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r.n}">${r.n}</div>
@@ -315,8 +314,7 @@ function renderAccionHoy() {
         <td><span style="font-size:10px;font-weight:700;background:var(--gray2);padding:2px 8px;border-radius:10px;white-space:nowrap">${r.planta}</span></td>
         <td class="r"><span style="font-family:var(--cond);font-size:18px;font-weight:900;color:#C8001E">${r.alcance.toFixed(1)}</span><div style="font-size:9px;color:var(--muted)">sem</div></td>
         <td class="r"><span style="font-family:var(--cond);font-size:15px;color:var(--dark2)">${r.fcst.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</span></td>
-      </tr>`).join('') : `<tr><td colspan="5" style="padding:8px 10px;font-size:11px;color:var(--muted)">Sin críticos estancados en este grupo con este filtro</td></tr>`}
-      `).join('')}
+      </tr>`).join('')}
       </tbody>
     </table>
     </div>
