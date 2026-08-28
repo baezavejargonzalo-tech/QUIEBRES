@@ -510,25 +510,31 @@ function renderMermaVenc() {
   if (q) items = items.filter(x => x.n.toLowerCase().includes(q));
   const crit = items.filter(x => x.nivel === 'critico');
   const ale = items.filter(x => x.nivel === 'alerta');
-  const row = (x, color, bg) => `
-    <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;background:${bg};margin-bottom:6px;border-left:4px solid ${color}">
-      <div style="flex:1;min-width:0">
-        <div style="font-size:12px;font-weight:700;color:var(--dark2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${x.n}</div>
-        <div style="font-size:10px;color:var(--muted)">${x.cat} · ${x.planta}</div>
-      </div>
-      <div style="text-align:right;white-space:nowrap">
-        <div style="font-family:var(--cond);font-size:18px;font-weight:800;color:${color}">${x.dias}d</div>
-        <div style="font-size:9px;color:var(--muted)">${x.kilos.toLocaleString('es-CL')} kg</div>
-      </div>
+  const table = (list, color) => `
+    <div style="overflow-x:auto">
+    <table class="tbl">
+      <thead><tr><th>SKU</th><th>Producto</th><th class="r">Días para vencer</th><th class="r">Kilos en riesgo</th></tr></thead>
+      <tbody>
+      ${list.map(x => `<tr>
+        <td style="font-size:11px;color:var(--muted);white-space:nowrap">${x.sku}</td>
+        <td style="font-weight:600;max-width:320px">
+          <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${x.n}">${x.n}</div>
+          <div style="font-size:10px;color:var(--muted)">${x.cat} · ${x.planta}</div>
+        </td>
+        <td class="r"><span style="font-family:var(--cond);font-size:18px;font-weight:800;color:${color}">${x.dias}</span><div style="font-size:9px;color:var(--muted)">días</div></td>
+        <td class="r"><span style="font-family:var(--cond);font-size:15px;font-weight:700;color:var(--dark2)">${x.kilos.toLocaleString('es-CL')}</span><div style="font-size:9px;color:var(--muted)">kg</div></td>
+      </tr>`).join('')}
+      </tbody>
+    </table>
     </div>`;
   let html = '';
   if (crit.length) {
     html += `<div style="font-size:11px;font-weight:800;color:#C8001E;text-transform:uppercase;letter-spacing:.5px;margin:14px 0 8px">🟠 Mermando — vencen esta semana (${crit.length})</div>`;
-    html += crit.map(x => row(x, '#C8001E', '#fff5f5')).join('');
+    html += table(crit, '#C8001E');
   }
   if (ale.length) {
     html += `<div style="font-size:11px;font-weight:800;color:#B8860B;text-transform:uppercase;letter-spacing:.5px;margin:14px 0 8px">🟡 Riesgo de merma — vencen en 1–4 semanas (${ale.length})</div>`;
-    html += ale.map(x => row(x, '#B8860B', '#fffbf0')).join('');
+    html += table(ale, '#B8860B');
   }
   if (!items.length) html = '<p style="color:var(--muted);font-size:13px;padding:12px 0">Sin productos próximos a vencer para este filtro</p>';
   el.innerHTML = html;
