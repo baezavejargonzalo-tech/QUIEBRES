@@ -307,30 +307,16 @@ function renderAccionHoy() {
     </div>`;
 }
 
-// Quiebre (ton) por SKU, cruzado por nombre contra el listado completo de
-// quiebre S31-S35 (DB_QUIEBRES.all.all.skus, sin tope de 50 — es la única
-// combinación tipo/semana que se guarda completa). Cacheado: se arma una
-// sola vez, no en cada render.
-let _quiebreByNameCache = null;
-function getQuiebreByName() {
-  if (_quiebreByNameCache) return _quiebreByNameCache;
-  const m = {};
-  (DB_QUIEBRES.all.all.skus || []).forEach(s => { m[s.n.toUpperCase().trim()] = s.q; });
-  _quiebreByNameCache = m;
-  return m;
-}
-
 // ── EXPORTAR TOP 50 A EXCEL (CSV) ──────────────────────────────────────────────
 // Junta, por SKU: estado de riesgo, stock, FCST, alcance (de RIESGOS),
-// quiebre (buscado por nombre en el listado de quiebres) y merma (buscada
-// por código de SKU en MERMA_VENC). Se exporta como CSV separado por ";"
-// con BOM UTF-8 — Excel lo abre directo, con acentos y decimales correctos.
-// Usa exactamente el mismo filtro combinado que se ve en la tabla de pantalla.
+// quiebre (r.quiebre_ton, cruzado por código de SKU contra LOGISTICO) y
+// merma (buscada por código de SKU en MERMA_VENC). Se exporta como CSV
+// separado por ";" con BOM UTF-8 — Excel lo abre directo, con acentos y
+// decimales correctos. Usa el mismo filtro combinado que la tabla en pantalla.
 function exportRiesgosExcel() {
   const filtered = getFilteredRiesgos();
   if (!filtered.length) { alert('No hay filas para exportar con este filtro.'); return; }
 
-  const quiebreByName = getQuiebreByName();
   const mermaBySku = {};
   (MERMA_VENC || []).forEach(m => { mermaBySku[m.sku] = m; });
 
@@ -343,14 +329,13 @@ function exportRiesgosExcel() {
   const numCols = [7, 8, 10, 11, 12, 14, 15, 16, 17, 18, 19, 20, 21];
 
   const rows = filtered.map(r => {
-    const q = quiebreByName[r.n.toUpperCase().trim()];
     const m = mermaBySku[r.sku];
     return [
       r.sku, r.n, r.cat, r.planta, r.grupo || '', cpfrLabel(r.tipo),
       r.riesgo === 'critico' ? 'Crítico' : 'Alerta',
       r.stock, r.stock_xlib || '', r.xlib_fecha || '', r.stock_bloq, r.stock_transito || '', r.devolucion || '',
       r.vu_cadenas || '', r.vu_kg || '', r.vta_int || '', r.vta_liq || '', r.fcst, r.alcance,
-      q !== undefined ? q : '',
+      r.quiebre_ton || '',
       m ? m.dias : '',
       m ? m.kilos : '',
       m ? (m.nivel === 'critico' ? 'Crítico' : 'Alerta') : ''
@@ -391,9 +376,8 @@ function renderRiesgosTable() {
   if (!filtered.length) { body.innerHTML = '<tr><td colspan="18" style="text-align:center;padding:2rem;color:var(--muted)">Sin datos para este filtro</td></tr>'; return; }
   const capado = ep === 'all' && filtered.length > 50;
   const rows = capado ? filtered.slice(0, 50) : filtered;
-  const quiebreByName = getQuiebreByName();
   let html = rows.map((r, i) => {
-    const quiebre = quiebreByName[r.n.toUpperCase().trim()];
+    const quiebre = r.quiebre_ton;
     const isCrit = r.riesgo === 'critico'; const col = isCrit ? '#C8001E' : '#B8860B'; const bp = Math.min((r.alcance / 4) * 100, 100).toFixed(1);
     return `<tr><td style="font-family:var(--cond);font-size:13px;font-weight:800;color:var(--muted2)">${i + 1}</td>
     <td style="font-weight:600;max-width:220px">
