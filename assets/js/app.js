@@ -92,6 +92,20 @@ function setRiesgSem(v) {
   if (lbl) lbl.textContent = (v === 'all' ? 'semana actual' : 'semana ' + v) + ' · ton';
   renderRiesgosSubcat();
   renderRiesgosQuebraKPIs();
+  renderRiesgosTable();
+}
+
+// Quiebre (ton) de un SKU para la "Semana quiebres" seleccionada arriba.
+// 'all' usa el total S31-S35 ya calculado en RIESGOS; un mes (ej. 'Ago')
+// suma las semanas de ese mes; una semana puntual (ej. 'S31') usa solo esa.
+function getQuiebreTon(r) {
+  if (riesgsSem === 'all') return r.quiebre_ton || 0;
+  const bySem = QUIEBRE_SKU_SEM[r.sku];
+  if (!bySem) return 0;
+  if (MES_MAP[riesgsSem]) {
+    return MES_MAP[riesgsSem].reduce((sum, s) => sum + (bySem[s] || 0), 0);
+  }
+  return bySem[riesgsSem] || 0;
 }
 function renderRiesgosSubcat() {
   // Usar datos de quiebres de la semana seleccionada para el chart subcategoría
@@ -236,6 +250,9 @@ function renderRiesgoCrossFilterNote() {
     const totalPlanta = RIESGOS.filter(r => r.planta === currentPlanta).length;
     html += `${html ? '<br>' : ''}📍 Mostrando el detalle <b>completo</b> de ${currentPlanta}: sus ${totalPlanta} SKU en riesgo (crítico + alerta).`;
   }
+  if (riesgsSem !== 'all') {
+    html += `${html ? '<br>' : ''}📅 La columna <b>Quiebre (ton)</b> muestra solo ${MES_MAP[riesgsSem] ? 'el mes' : 'la semana'} <b>${riesgsSem}</b> (seleccionado en "Semana quiebres" más arriba), no el total S31-S35.`;
+  }
   if (html) { el.style.display = ''; el.innerHTML = html; } else { el.style.display = 'none'; }
 }
 
@@ -309,8 +326,9 @@ function renderAccionHoy() {
 
 // ── EXPORTAR TOP 50 A EXCEL (CSV) ──────────────────────────────────────────────
 // Junta, por SKU: estado de riesgo, stock, FCST, alcance (de RIESGOS),
-// quiebre (r.quiebre_ton, cruzado por código de SKU contra LOGISTICO) y
-// merma (buscada por código de SKU en MERMA_VENC). Se exporta como CSV
+// quiebre (getQuiebreTon — total o acotado a la semana/mes elegido en
+// "Semana quiebres", cruzado por código de SKU contra LOGISTICO) y merma
+// (buscada por código de SKU en MERMA_VENC). Se exporta como CSV
 // separado por ";" con BOM UTF-8 — Excel lo abre directo, con acentos y
 // decimales correctos. Usa el mismo filtro combinado que la tabla en pantalla.
 function exportRiesgosExcel() {
@@ -335,7 +353,7 @@ function exportRiesgosExcel() {
       r.riesgo === 'critico' ? 'Crítico' : 'Alerta',
       r.stock, r.stock_xlib || '', r.xlib_fecha || '', r.stock_bloq, r.stock_transito || '', r.devolucion || '',
       r.vu_cadenas || '', r.vu_kg || '', r.vta_int || '', r.vta_liq || '', r.fcst, r.alcance,
-      r.quiebre_ton || '',
+      getQuiebreTon(r) || '',
       m ? m.dias : '',
       m ? m.kilos : '',
       m ? (m.nivel === 'critico' ? 'Crítico' : 'Alerta') : ''
@@ -377,7 +395,7 @@ function renderRiesgosTable() {
   const capado = ep === 'all' && filtered.length > 50;
   const rows = capado ? filtered.slice(0, 50) : filtered;
   let html = rows.map((r, i) => {
-    const quiebre = r.quiebre_ton;
+    const quiebre = getQuiebreTon(r);
     const isCrit = r.riesgo === 'critico'; const col = isCrit ? '#C8001E' : '#B8860B'; const bp = Math.min((r.alcance / 4) * 100, 100).toFixed(1);
     return `<tr><td style="font-family:var(--cond);font-size:13px;font-weight:800;color:var(--muted2)">${i + 1}</td>
     <td style="font-weight:600;max-width:220px">
