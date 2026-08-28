@@ -495,42 +495,12 @@ function renderRiesgosTable() {
   body.innerHTML = html;
 }
 
-function renderMermaVenc(filtroPlanta) {
+// Lista de vencimiento de la pestaña Riesgo de Merma (mermando = vencen
+// esta semana, riesgo de merma = 1-4 semanas). Respeta los mismos filtros
+// compartidos de la barra superior (Planta/Categoría/Búsqueda) en vez de
+// un selector de planta aparte.
+function renderMermaVenc() {
   const el = document.getElementById('mermaVencList');
-  if (!el || !MERMA_VENC || !MERMA_VENC.length) { if (el) el.innerHTML = '<p style="color:var(--muted);font-size:13px">Sin datos de vencimiento disponibles</p>'; return; }
-  const items = filtroPlanta && filtroPlanta !== 'all' ? MERMA_VENC.filter(x => x.planta === filtroPlanta) : MERMA_VENC;
-  const crit = items.filter(x => x.nivel === 'critico');
-  const ale = items.filter(x => x.nivel === 'alerta');
-  const row = (x, color, bg) => `
-    <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;background:${bg};margin-bottom:6px;border-left:4px solid ${color}">
-      <div style="flex:1;min-width:0">
-        <div style="font-size:12px;font-weight:700;color:var(--dark2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${x.n}</div>
-        <div style="font-size:10px;color:var(--muted)">${x.cat} · ${x.planta}</div>
-      </div>
-      <div style="text-align:right;white-space:nowrap">
-        <div style="font-family:var(--cond);font-size:18px;font-weight:800;color:${color}">${x.dias}d</div>
-        <div style="font-size:9px;color:var(--muted)">${x.kilos.toLocaleString('es-CL')} kg</div>
-      </div>
-    </div>`;
-  let html = '';
-  if (crit.length) {
-    html += `<div style="font-size:11px;font-weight:800;color:#C8001E;text-transform:uppercase;letter-spacing:.5px;margin:14px 0 8px">🔴 Vencen esta semana (${crit.length})</div>`;
-    html += crit.map(x => row(x, '#C8001E', '#fff5f5')).join('');
-  }
-  if (ale.length) {
-    html += `<div style="font-size:11px;font-weight:800;color:#B8860B;text-transform:uppercase;letter-spacing:.5px;margin:14px 0 8px">🟡 Vencen en 1–4 semanas (${ale.length})</div>`;
-    html += ale.map(x => row(x, '#B8860B', '#fffbf0')).join('');
-  }
-  if (!items.length) html = '<p style="color:var(--muted);font-size:13px;padding:12px 0">Sin productos próximos a vencer para esta planta</p>';
-  el.innerHTML = html;
-}
-
-// Muestra en la pestaña Riesgo de Quiebre los mismos SKU con riesgo de
-// merma (mermando = vencen esta semana, riesgo de merma = 1-4 semanas),
-// respetando Planta/Categoría/Búsqueda de los filtros de arriba — para no
-// tener que cambiar a la pestaña de Merma para verlos.
-function renderMermaEnQuiebre() {
-  const el = document.getElementById('mermaEnQuiebreList');
   if (!el) return;
   if (!MERMA_VENC || !MERMA_VENC.length) { el.innerHTML = '<p style="color:var(--muted);font-size:13px">Sin datos de vencimiento disponibles</p>'; return; }
   let items = MERMA_VENC;
@@ -560,16 +530,8 @@ function renderMermaEnQuiebre() {
     html += `<div style="font-size:11px;font-weight:800;color:#B8860B;text-transform:uppercase;letter-spacing:.5px;margin:14px 0 8px">🟡 Riesgo de merma — vencen en 1–4 semanas (${ale.length})</div>`;
     html += ale.map(x => row(x, '#B8860B', '#fffbf0')).join('');
   }
-  if (!items.length) html = '<p style="color:var(--muted);font-size:13px;padding:12px 0">Sin SKU con riesgo de merma para este filtro</p>';
+  if (!items.length) html = '<p style="color:var(--muted);font-size:13px;padding:12px 0">Sin productos próximos a vencer para este filtro</p>';
   el.innerHTML = html;
-}
-
-let _mermaPlanta = 'all';
-function setMermaPlanta(p, btn) {
-  document.querySelectorAll('.mv-planta-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  _mermaPlanta = p;
-  renderMermaVenc(p);
 }
 
 // ── RIESGO FUTURO: toggle Quiebre / Merma ─────────────────────────────────────
@@ -615,9 +577,8 @@ function renderRiesgos() {
   renderRiesgosQuebraKPIs();
   renderRiesgosSubcat();
   renderRiesgosTable();
-  renderMermaEnQuiebre();
 
-  renderMermaVenc(_mermaPlanta);
+  renderMermaVenc();
   renderRiesgoMermaKpis();
 }
 
@@ -628,12 +589,6 @@ function initRiesgosControls() {
     (SEMS_Q['all'] || []).forEach(s => { const o = document.createElement('option'); o.value = s.s; o.textContent = s.s; rSem.appendChild(o); });
     Object.keys(MES_MAP).forEach(m => { const o = document.createElement('option'); o.value = m; o.textContent = '📅 ' + m; rSem.appendChild(o); });
     rSem.value = riesgsSem;
-  }
-  const btnDiv = document.getElementById('mermaPlantaBtns');
-  if (btnDiv && MERMA_VENC && MERMA_VENC.length && !btnDiv.childElementCount) {
-    const plantas = [...new Set(MERMA_VENC.map(x => x.planta))].sort();
-    btnDiv.innerHTML = `<button class="mv-planta-btn active" onclick="setMermaPlanta('all',this)" style="padding:4px 12px;border-radius:20px;border:1px solid #ddd;background:#C8001E;color:#fff;font-size:11px;font-weight:700;cursor:pointer">Todas</button>`
-      + plantas.map(p => `<button class="mv-planta-btn" onclick="setMermaPlanta('${p}',this)" style="padding:4px 12px;border-radius:20px;border:1px solid #ddd;background:var(--card);color:var(--dark2);font-size:11px;font-weight:600;cursor:pointer">${p}</button>`).join('');
   }
 }
 
