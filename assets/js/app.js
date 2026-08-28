@@ -307,6 +307,19 @@ function renderAccionHoy() {
     </div>`;
 }
 
+// Quiebre (ton) por SKU, cruzado por nombre contra el listado completo de
+// quiebre S31-S35 (DB_QUIEBRES.all.all.skus, sin tope de 50 — es la única
+// combinación tipo/semana que se guarda completa). Cacheado: se arma una
+// sola vez, no en cada render.
+let _quiebreByNameCache = null;
+function getQuiebreByName() {
+  if (_quiebreByNameCache) return _quiebreByNameCache;
+  const m = {};
+  (DB_QUIEBRES.all.all.skus || []).forEach(s => { m[s.n.toUpperCase().trim()] = s.q; });
+  _quiebreByNameCache = m;
+  return m;
+}
+
 // ── EXPORTAR TOP 50 A EXCEL (CSV) ──────────────────────────────────────────────
 // Junta, por SKU: estado de riesgo, stock, FCST, alcance (de RIESGOS),
 // quiebre (buscado por nombre en el listado de quiebres) y merma (buscada
@@ -317,8 +330,7 @@ function exportRiesgosExcel() {
   const filtered = getFilteredRiesgos();
   if (!filtered.length) { alert('No hay filas para exportar con este filtro.'); return; }
 
-  const quiebreByName = {};
-  (DB_QUIEBRES.all.all.skus || []).forEach(s => { quiebreByName[s.n.toUpperCase().trim()] = s.q; });
+  const quiebreByName = getQuiebreByName();
   const mermaBySku = {};
   (MERMA_VENC || []).forEach(m => { mermaBySku[m.sku] = m; });
 
@@ -376,10 +388,12 @@ function renderRiesgosTable() {
   }
   renderRiesgoCrossFilterNote();
   const filtered = getFilteredRiesgos();
-  if (!filtered.length) { body.innerHTML = '<tr><td colspan="17" style="text-align:center;padding:2rem;color:var(--muted)">Sin datos para este filtro</td></tr>'; return; }
+  if (!filtered.length) { body.innerHTML = '<tr><td colspan="18" style="text-align:center;padding:2rem;color:var(--muted)">Sin datos para este filtro</td></tr>'; return; }
   const capado = ep === 'all' && filtered.length > 50;
   const rows = capado ? filtered.slice(0, 50) : filtered;
+  const quiebreByName = getQuiebreByName();
   let html = rows.map((r, i) => {
+    const quiebre = quiebreByName[r.n.toUpperCase().trim()];
     const isCrit = r.riesgo === 'critico'; const col = isCrit ? '#C8001E' : '#B8860B'; const bp = Math.min((r.alcance / 4) * 100, 100).toFixed(1);
     return `<tr><td style="font-family:var(--cond);font-size:13px;font-weight:800;color:var(--muted2)">${i + 1}</td>
     <td style="font-weight:600;max-width:220px">
@@ -394,6 +408,7 @@ function renderRiesgosTable() {
     <td class="r" style="font-size:11px;color:#2D5BE3;white-space:nowrap">${r.xlib_fecha || '<span style="color:var(--muted)">—</span>'}</td>
     <td class="r">${r.stock_transito > 0 ? `<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#7A5AA0">${r.stock_transito.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</div><div class="tbl-unit">kg</div>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
     <td class="r">${r.devolucion > 0 ? `<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#a03050">${r.devolucion.toLocaleString('es-CL', { minimumFractionDigits: 2 })}</div><div class="tbl-unit">ton</div>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
+    <td class="r">${quiebre > 0 ? `<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#C8001E">${quiebre.toLocaleString('es-CL', { minimumFractionDigits: 1 })}</div><div class="tbl-unit">ton</div>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
     <td style="font-size:10.5px;color:#C8001E;font-weight:600;max-width:160px">${r.vu_cadenas || '<span style="color:var(--muted);font-weight:400">—</span>'}</td>
     <td class="r">${r.vu_kg > 0 ? `<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#C8001E">${r.vu_kg.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</div><div class="tbl-unit">kg</div>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
     <td class="r">${r.vta_int > 0 ? `<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#7A5A10">${r.vta_int.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</div><div class="tbl-unit">kg</div>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
@@ -403,7 +418,7 @@ function renderRiesgosTable() {
     <td class="r"><span class="chip ${isCrit ? 'c-red' : 'c-amb'}">${isCrit ? '🔴 CRÍTICO' : '🟡 ALERTA'}</span></td></tr>`;
   }).join('');
   if (capado) {
-    html += `<tr><td colspan="17" style="text-align:center;padding:10px;font-size:11px;color:var(--muted)">Mostrando 50 de ${filtered.length} SKU en riesgo con este filtro — usa <b>⬇ Descargar Excel</b> para ver el listado completo.</td></tr>`;
+    html += `<tr><td colspan="18" style="text-align:center;padding:10px;font-size:11px;color:var(--muted)">Mostrando 50 de ${filtered.length} SKU en riesgo con este filtro — usa <b>⬇ Descargar Excel</b> para ver el listado completo.</td></tr>`;
   }
   body.innerHTML = html;
 }
