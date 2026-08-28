@@ -338,18 +338,18 @@ function exportRiesgosExcel() {
   const mermaBySku = {};
   (MERMA_VENC || []).forEach(m => { mermaBySku[m.sku] = m; });
 
-  const headers = ['SKU', 'Producto', 'Categoría', 'CPFR', 'Planta',
+  const headers = ['SKU', 'Producto', 'Planta',
     'FCST semanal (kg)', 'Alcance (sem)', 'Estado riesgo',
     'Stock disponible (kg)', 'Quiebre (ton)', 'Stock bloqueado (kg)', 'Stock XLIB (kg)', 'Fecha liberación XLIB',
     'Stock tránsito (kg)', 'Devoluciones (ton)', 'Cadenas fuera de filtro VU', 'Kg fuera de filtro VU',
     'Venta Intermedia (kg)', 'Venta Liquidación (kg)',
-    'Merma - días a vencer', 'Merma - kg en riesgo', 'Merma - nivel', 'Grupo de Marketing'];
-  const numCols = [5, 6, 8, 9, 10, 11, 13, 14, 16, 17, 18, 19, 20];
+    'Merma - días a vencer', 'Merma - kg en riesgo', 'Merma - nivel', 'Grupo de Marketing', 'Categoría', 'CPFR'];
+  const numCols = [3, 4, 6, 7, 8, 9, 11, 12, 14, 15, 16, 17, 18];
 
   const rows = filtered.map(r => {
     const m = mermaBySku[r.sku];
     return [
-      r.sku, r.n, r.cat, cpfrLabel(r.tipo), r.planta,
+      r.sku, r.n, r.planta,
       r.fcst, r.alcance,
       r.riesgo === 'critico' ? 'Crítico' : 'Alerta',
       r.stock, getQuiebreTon(r) || '', r.stock_bloq, r.stock_xlib || '', r.xlib_fecha || '',
@@ -358,7 +358,7 @@ function exportRiesgosExcel() {
       m ? m.dias : '',
       m ? m.kilos : '',
       m ? (m.nivel === 'critico' ? 'Crítico' : 'Alerta') : '',
-      r.grupo || ''
+      r.grupo || '', r.cat, cpfrLabel(r.tipo)
     ];
   });
 
@@ -405,8 +405,6 @@ function renderRiesgosTable() {
       <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r.n}">${r.n}</div>
       <div style="background:var(--gray2);border-radius:3px;height:4px;margin-top:4px"><div style="height:4px;border-radius:3px;width:${bp}%;background:${col}"></div></div>
     </td>
-    <td style="font-size:11px;color:var(--muted)">${r.cat}</td>
-    <td style="font-size:11px;color:var(--muted)">${cpfrLabel(r.tipo)}</td>
     <td class="r"><div style="font-family:var(--cond);font-size:17px;color:var(--dark2)">${r.fcst.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</div></td>
     <td class="r"><div style="font-family:var(--cond);font-size:22px;font-weight:900;color:${col}">${r.alcance.toFixed(1)}</div><div style="font-size:9px;color:var(--muted)">sem</div></td>
     <td class="r"><span class="chip ${isCrit ? 'c-red' : 'c-amb'}">${isCrit ? '🔴 CRÍTICO' : '🟡 ALERTA'}</span></td>
@@ -421,7 +419,9 @@ function renderRiesgosTable() {
     <td class="r">${r.vu_kg > 0 ? `<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#C8001E">${r.vu_kg.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</div><div class="tbl-unit">kg</div>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
     <td class="r">${r.vta_int > 0 ? `<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#7A5A10">${r.vta_int.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</div><div class="tbl-unit">kg</div>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
     <td class="r">${r.vta_liq > 0 ? `<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#c84000">${r.vta_liq.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</div><div class="tbl-unit">kg</div>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
-    <td style="font-size:11px;color:var(--muted);white-space:nowrap">${r.grupo || '<span style="color:var(--muted)">—</span>'}</td></tr>`;
+    <td style="font-size:11px;color:var(--muted);white-space:nowrap">${r.grupo || '<span style="color:var(--muted)">—</span>'}</td>
+    <td style="font-size:11px;color:var(--muted)">${r.cat}</td>
+    <td style="font-size:11px;color:var(--muted)">${cpfrLabel(r.tipo)}</td></tr>`;
   }).join('');
   if (capado) {
     html += `<tr><td colspan="20" style="text-align:center;padding:10px;font-size:11px;color:var(--muted)">Mostrando 50 de ${filtered.length} SKU en riesgo con este filtro — usa <b>⬇ Descargar Excel</b> para ver el listado completo.</td></tr>`;
