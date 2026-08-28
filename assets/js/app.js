@@ -450,16 +450,23 @@ function renderRiesgosTable() {
   if (!filtered.length) { body.innerHTML = '<tr><td colspan="23" style="text-align:center;padding:2rem;color:var(--muted)">Sin datos para este filtro</td></tr>'; return; }
   const capado = ep === 'all' && filtered.length > 50;
   const rows = capado ? filtered.slice(0, 50) : filtered;
+  const mermaBySku = {};
+  (MERMA_VENC || []).forEach(m => { mermaBySku[m.sku] = m; });
   let html = rows.map((r, i) => {
     const quiebre = getQuiebreTon(r);
     const isCrit = r.riesgo === 'critico';
     const alcCol = r.alcance <= 1 ? '#C8001E' : r.alcance <= 1.5 ? '#B8860B' : '#1a8a3a';
     const bp = Math.min((r.alcance / 4) * 100, 100).toFixed(1);
+    const m = mermaBySku[r.sku];
+    const mermaBadge = m ? (m.nivel === 'critico'
+      ? `<span style="display:inline-block;margin-top:3px;font-size:9.5px;font-weight:700;color:#C8001E;background:#fff0f0;border:1px solid #ffc9c9;border-radius:8px;padding:1px 6px">🟠 Mermando · vence en ${m.dias}d</span>`
+      : `<span style="display:inline-block;margin-top:3px;font-size:9.5px;font-weight:700;color:#B8860B;background:#fffbf0;border:1px solid #fde0a0;border-radius:8px;padding:1px 6px">🟡 Riesgo de merma · ${m.dias}d</span>`) : '';
     return `<tr><td style="font-family:var(--cond);font-size:13px;font-weight:800;color:var(--muted2)">${i + 1}</td>
     <td style="font-size:11px;color:var(--muted);white-space:nowrap">${r.sku}</td>
     <td style="font-weight:600;max-width:220px">
       <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r.n}">${r.n}</div>
       <div style="background:var(--gray2);border-radius:3px;height:4px;margin-top:4px"><div style="height:4px;border-radius:3px;width:${bp}%;background:${alcCol}"></div></div>
+      ${mermaBadge}
     </td>
     <td class="r"><div style="font-family:var(--cond);font-size:17px;color:var(--dark2)">${r.fcst.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</div></td>
     <td class="r"><div style="font-family:var(--cond);font-size:22px;font-weight:900;color:${alcCol}">${r.alcance.toFixed(1)}</div><div style="font-size:9px;color:var(--muted)">sem</div></td>
@@ -518,6 +525,45 @@ function renderMermaVenc(filtroPlanta) {
   el.innerHTML = html;
 }
 
+// Muestra en la pestaña Riesgo de Quiebre los mismos SKU con riesgo de
+// merma (mermando = vencen esta semana, riesgo de merma = 1-4 semanas),
+// respetando Planta/Categoría/Búsqueda de los filtros de arriba — para no
+// tener que cambiar a la pestaña de Merma para verlos.
+function renderMermaEnQuiebre() {
+  const el = document.getElementById('mermaEnQuiebreList');
+  if (!el) return;
+  if (!MERMA_VENC || !MERMA_VENC.length) { el.innerHTML = '<p style="color:var(--muted);font-size:13px">Sin datos de vencimiento disponibles</p>'; return; }
+  let items = MERMA_VENC;
+  if (currentPlanta !== 'all') items = items.filter(x => x.planta === currentPlanta);
+  if (currentCategoria !== 'all') items = items.filter(x => x.cat === currentCategoria);
+  const q = skuSearch.trim().toLowerCase();
+  if (q) items = items.filter(x => x.n.toLowerCase().includes(q));
+  const crit = items.filter(x => x.nivel === 'critico');
+  const ale = items.filter(x => x.nivel === 'alerta');
+  const row = (x, color, bg) => `
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;background:${bg};margin-bottom:6px;border-left:4px solid ${color}">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:700;color:var(--dark2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${x.n}</div>
+        <div style="font-size:10px;color:var(--muted)">${x.cat} · ${x.planta}</div>
+      </div>
+      <div style="text-align:right;white-space:nowrap">
+        <div style="font-family:var(--cond);font-size:18px;font-weight:800;color:${color}">${x.dias}d</div>
+        <div style="font-size:9px;color:var(--muted)">${x.kilos.toLocaleString('es-CL')} kg</div>
+      </div>
+    </div>`;
+  let html = '';
+  if (crit.length) {
+    html += `<div style="font-size:11px;font-weight:800;color:#C8001E;text-transform:uppercase;letter-spacing:.5px;margin:14px 0 8px">🟠 Mermando — vencen esta semana (${crit.length})</div>`;
+    html += crit.map(x => row(x, '#C8001E', '#fff5f5')).join('');
+  }
+  if (ale.length) {
+    html += `<div style="font-size:11px;font-weight:800;color:#B8860B;text-transform:uppercase;letter-spacing:.5px;margin:14px 0 8px">🟡 Riesgo de merma — vencen en 1–4 semanas (${ale.length})</div>`;
+    html += ale.map(x => row(x, '#B8860B', '#fffbf0')).join('');
+  }
+  if (!items.length) html = '<p style="color:var(--muted);font-size:13px;padding:12px 0">Sin SKU con riesgo de merma para este filtro</p>';
+  el.innerHTML = html;
+}
+
 let _mermaPlanta = 'all';
 function setMermaPlanta(p, btn) {
   document.querySelectorAll('.mv-planta-btn').forEach(b => b.classList.remove('active'));
@@ -569,6 +615,7 @@ function renderRiesgos() {
   renderRiesgosQuebraKPIs();
   renderRiesgosSubcat();
   renderRiesgosTable();
+  renderMermaEnQuiebre();
 
   renderMermaVenc(_mermaPlanta);
   renderRiesgoMermaKpis();
