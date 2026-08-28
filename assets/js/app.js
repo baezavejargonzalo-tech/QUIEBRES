@@ -198,17 +198,17 @@ function renderRiesgosQuebraKPIs() {
   if (!el || !d) return;
   const semLabel = sem || 'Todas las semanas';
   el.innerHTML = `
-    <div style="background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 18px;display:flex;align-items:center;gap:14px">
-      <div style="font-size:32px;font-family:var(--cond);font-weight:900;color:#C8001E">${d.q.toLocaleString('es-CL', { minimumFractionDigits: 1 })}</div>
-      <div><div style="font-size:11px;font-weight:800;color:#C8001E;text-transform:uppercase">ton Quebradas</div><div style="font-size:10px;color:var(--muted)">${semLabel}</div></div>
+    <div style="background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:8px 14px;display:flex;align-items:center;gap:8px;flex:1;min-width:150px">
+      <div style="font-size:18px;font-family:var(--cond);font-weight:900;color:#C8001E">${d.q.toLocaleString('es-CL', { minimumFractionDigits: 1 })}</div>
+      <div><div style="font-size:9.5px;font-weight:800;color:#C8001E;text-transform:uppercase">ton Quebradas</div><div style="font-size:9px;color:var(--muted)">${semLabel}</div></div>
     </div>
-    <div style="background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 18px;display:flex;align-items:center;gap:14px">
-      <div style="font-size:32px;font-family:var(--cond);font-weight:900;color:#2D5BE3">${d.fcst.toLocaleString('es-CL', { minimumFractionDigits: 1 })}</div>
-      <div><div style="font-size:11px;font-weight:800;color:#2D5BE3;text-transform:uppercase">ton FCST</div><div style="font-size:10px;color:var(--muted)">${semLabel}</div></div>
+    <div style="background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:8px 14px;display:flex;align-items:center;gap:8px;flex:1;min-width:150px">
+      <div style="font-size:18px;font-family:var(--cond);font-weight:900;color:#2D5BE3">${d.fcst.toLocaleString('es-CL', { minimumFractionDigits: 1 })}</div>
+      <div><div style="font-size:9.5px;font-weight:800;color:#2D5BE3;text-transform:uppercase">ton FCST</div><div style="font-size:9px;color:var(--muted)">${semLabel}</div></div>
     </div>
-    <div style="background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 18px;display:flex;align-items:center;gap:14px">
-      <div style="font-size:32px;font-family:var(--cond);font-weight:900;color:#009060">${d.vr.toLocaleString('es-CL', { minimumFractionDigits: 1 })}</div>
-      <div><div style="font-size:11px;font-weight:800;color:#009060;text-transform:uppercase">ton Venta Real</div><div style="font-size:10px;color:var(--muted)">${semLabel}</div></div>
+    <div style="background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:8px 14px;display:flex;align-items:center;gap:8px;flex:1;min-width:150px">
+      <div style="font-size:18px;font-family:var(--cond);font-weight:900;color:#009060">${d.vr.toLocaleString('es-CL', { minimumFractionDigits: 1 })}</div>
+      <div><div style="font-size:9.5px;font-weight:800;color:#009060;text-transform:uppercase">ton Venta Real</div><div style="font-size:9px;color:var(--muted)">${semLabel}</div></div>
     </div>`;
 }
 
