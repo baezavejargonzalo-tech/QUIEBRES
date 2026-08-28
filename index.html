@@ -54,12 +54,14 @@
         <option value="all">Todas las plantas</option>
       </select>
     </div>
-    <div class="filter-group">
+    <div class="filter-group" style="position:relative">
       <span class="filter-label">Grupo</span>
-      <select class="week-sel tipo-toggle" id="grupoSel" onchange="setGrupo(this.value)"
-              style="min-width:170px" title="Filtrar por grupo de marketing">
-        <option value="all">Todos los grupos</option>
-      </select>
+      <button type="button" id="grupoSelBtn" class="week-sel" onclick="toggleGrupoDropdown(event)"
+              style="min-width:170px;display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fff;border-color:var(--border);color:var(--text)"
+              title="Filtrar por grupo de marketing (elige uno o varios)">
+        <span id="grupoSelLabel">Todos los grupos</span><span style="font-size:9px;color:var(--muted)">▾</span>
+      </button>
+      <div id="grupoDropdown" style="display:none;position:absolute;top:100%;left:0;margin-top:4px;background:#fff;border:1.5px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.15);padding:6px;z-index:60;min-width:240px;max-height:280px;overflow-y:auto"></div>
     </div>
     <div class="filter-group">
       <span class="filter-label">Categoría</span>

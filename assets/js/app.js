@@ -1,7 +1,7 @@
 // ── ESTADO ─────────────────────────────────────────────────────────────────────
 let currentTipo = 'all';
 let currentPlanta = 'all';
-let currentGrupo = 'all';
+let currentGrupo = []; // varios grupos de marketing seleccionables a la vez
 let currentCategoria = 'all';
 let skuSearch = '';
 
@@ -21,10 +21,35 @@ function setPlanta(val) {
   currentPlanta = val;
   renderRiesgos();
 }
-function setGrupo(val) {
-  currentGrupo = val;
+function toggleGrupoFilter(g, checked) {
+  if (checked) {
+    if (!currentGrupo.includes(g)) currentGrupo.push(g);
+  } else {
+    currentGrupo = currentGrupo.filter(x => x !== g);
+  }
+  updateGrupoLabel();
   renderRiesgos();
 }
+function updateGrupoLabel() {
+  const lbl = document.getElementById('grupoSelLabel');
+  if (!lbl) return;
+  if (currentGrupo.length === 0) lbl.textContent = 'Todos los grupos';
+  else if (currentGrupo.length === 1) lbl.textContent = currentGrupo[0];
+  else lbl.textContent = `${currentGrupo.length} grupos seleccionados`;
+}
+function toggleGrupoDropdown(ev) {
+  if (ev) ev.stopPropagation();
+  const dd = document.getElementById('grupoDropdown');
+  if (!dd) return;
+  dd.style.display = dd.style.display === 'none' ? '' : 'none';
+}
+document.addEventListener('click', ev => {
+  const dd = document.getElementById('grupoDropdown');
+  const btn = document.getElementById('grupoSelBtn');
+  if (!dd || dd.style.display === 'none') return;
+  if (dd.contains(ev.target) || (btn && btn.contains(ev.target))) return;
+  dd.style.display = 'none';
+});
 function setCategoria(val) {
   currentCategoria = val;
   renderRiesgos();
@@ -36,14 +61,14 @@ function setSkuSearch(val) {
 function resetFiltros() {
   currentTipo = 'all';
   currentPlanta = 'all';
-  currentGrupo = 'all';
+  currentGrupo = [];
   currentCategoria = 'all';
   skuSearch = '';
   document.querySelectorAll('.filterbar .tipo-btn').forEach((b, i) => b.classList.toggle('active', i === 0));
   const pSel = document.getElementById('plantaSel');
   if (pSel) pSel.value = 'all';
-  const gSel = document.getElementById('grupoSel');
-  if (gSel) gSel.value = 'all';
+  document.querySelectorAll('#grupoDropdown input[type=checkbox]').forEach(cb => cb.checked = false);
+  updateGrupoLabel();
   const cSel = document.getElementById('categoriaSel');
   if (cSel) cSel.value = 'all';
   const sInput = document.getElementById('skuSearchInput');
@@ -62,15 +87,16 @@ function initPlantaSelect() {
   });
 }
 function initGrupoSelect() {
-  const sel = document.getElementById('grupoSel');
-  if (!sel || sel.options.length > 1) return;
+  const dd = document.getElementById('grupoDropdown');
+  if (!dd || dd.dataset.init) return;
+  dd.dataset.init = '1';
   const grupos = [...new Set(RIESGOS.map(r => r.grupo))].filter(Boolean).sort();
-  grupos.forEach(g => {
-    const o = document.createElement('option');
-    o.value = g; o.textContent = g;
-    sel.appendChild(o);
-  });
-  sel.title = `Filtrar por grupo de marketing — cruzado por SKU con LOGISTICO: ${GRUPO_COVERAGE.con_grupo} de ${GRUPO_COVERAGE.total} SKU en riesgo tienen grupo asignado`;
+  dd.innerHTML = grupos.map(g => `
+    <label style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:12.5px;color:var(--dark2);white-space:nowrap">
+      <input type="checkbox" value="${g}" onchange="toggleGrupoFilter('${g}', this.checked)">${g}
+    </label>`).join('');
+  const btn = document.getElementById('grupoSelBtn');
+  if (btn) btn.title = `Filtrar por grupo de marketing (elige uno o varios) — cruzado por SKU con LOGISTICO: ${GRUPO_COVERAGE.con_grupo} de ${GRUPO_COVERAGE.total} SKU en riesgo tienen grupo asignado`;
 }
 function initCategoriaSelect() {
   const sel = document.getElementById('categoriaSel');
@@ -210,7 +236,7 @@ function filterRiesgosBase(list) {
   let filtered = list;
   if (currentPlanta !== 'all') filtered = filtered.filter(r => r.planta === currentPlanta);
   if (currentTipo !== 'all') filtered = filtered.filter(r => r.tipo === currentTipo);
-  if (currentGrupo !== 'all') filtered = filtered.filter(r => r.grupo === currentGrupo);
+  if (currentGrupo.length) filtered = filtered.filter(r => currentGrupo.includes(r.grupo));
   if (currentCategoria !== 'all') filtered = filtered.filter(r => r.cat === currentCategoria);
   const q = skuSearch.trim().toLowerCase();
   if (q) filtered = filtered.filter(r => r.n.toLowerCase().includes(q));
@@ -235,7 +261,7 @@ function renderRiesgoCrossFilterNote() {
   const activos = [];
   if (currentTipo !== 'all') activos.push(`CPFR: ${cpfrLabel(currentTipo)}`);
   if (currentPlanta !== 'all') activos.push(`Planta: ${currentPlanta}`);
-  if (currentGrupo !== 'all') activos.push(`Grupo: ${currentGrupo}`);
+  if (currentGrupo.length) activos.push(`Grupo: ${currentGrupo.join(', ')}`);
   if (currentCategoria !== 'all') activos.push(`Categoría: ${currentCategoria}`);
   if (skuSearch.trim()) activos.push(`Búsqueda: "${skuSearch.trim()}"`);
 
@@ -243,7 +269,7 @@ function renderRiesgoCrossFilterNote() {
   if (activos.length) {
     html += `🔗 Filtros activos — ${activos.join(' · ')}. <button onclick="resetFiltros()" style="border:none;background:none;color:var(--red);font-weight:700;font-size:12px;cursor:pointer;padding:0;text-decoration:underline">Quitar</button>`;
   }
-  if (currentGrupo !== 'all') {
+  if (currentGrupo.length) {
     html += `${html ? '<br>' : ''}ℹ️ El Grupo de Marketing se cruza por código de SKU con el historial de quiebres (LOGISTICO) — solo ${GRUPO_COVERAGE.con_grupo} de los ${GRUPO_COVERAGE.total} SKU en riesgo tienen grupo asignado; los que no tienen pedidos recientes no aparecen al filtrar por grupo.`;
   }
   if (currentPlanta !== 'all') {
@@ -293,13 +319,11 @@ function renderAccionHoy() {
     </div>`;
 
   const gruposAccion = ['GRUPO PLF', 'GRUPO QUESOS, UNTABLES Y JUGOS', 'GRUPO FRUTAS Y ACEITES', 'GRUPO LACTEOS Y JUGOS'];
-  const filtroGrupoActivo = currentGrupo !== 'all';
-  const porGrupo = filtroGrupoActivo
-    ? [{ g: currentGrupo, items: estancados, total: estancados.length }]
-    : gruposAccion.map(g => {
-        const all = estancados.filter(r => r.grupo === g);
-        return { g, items: all.slice(0, 3), total: all.length };
-      });
+  const filtroGrupoActivo = currentGrupo.length > 0;
+  const porGrupo = (filtroGrupoActivo ? currentGrupo : gruposAccion).map(g => {
+    const all = estancados.filter(r => r.grupo === g);
+    return { g, items: filtroGrupoActivo ? all : all.slice(0, 3), total: all.length };
+  });
   const totalMostrados = porGrupo.reduce((acc, x) => acc + x.items.length, 0);
   const hayMasPorGrupo = !filtroGrupoActivo && porGrupo.some(x => x.total > 3);
   const itemsFlat = porGrupo.flatMap(x => x.items);
