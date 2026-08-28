@@ -339,26 +339,26 @@ function exportRiesgosExcel() {
   (MERMA_VENC || []).forEach(m => { mermaBySku[m.sku] = m; });
 
   const headers = ['SKU', 'Producto', 'Planta',
-    'FCST semanal (kg)', 'Alcance (sem)', 'Estado riesgo',
+    'FCST semanal (kg)', 'Alcance (sem)',
     'Stock disponible (kg)', 'Quiebre (ton)', 'Stock bloqueado (kg)', 'Stock XLIB (kg)', 'Fecha liberación XLIB',
     'Stock tránsito (kg)', 'Devoluciones (ton)', 'Cadenas fuera de filtro VU', 'Kg fuera de filtro VU',
     'Venta Intermedia (kg)', 'Venta Liquidación (kg)',
-    'Merma - días a vencer', 'Merma - kg en riesgo', 'Merma - nivel', 'Grupo de Marketing', 'Categoría', 'CPFR'];
-  const numCols = [3, 4, 6, 7, 8, 9, 11, 12, 14, 15, 16, 17, 18];
+    'Merma - días a vencer', 'Merma - kg en riesgo', 'Merma - nivel', 'Grupo de Marketing', 'Categoría', 'CPFR', 'Estado riesgo'];
+  const numCols = [3, 4, 5, 6, 7, 8, 10, 11, 13, 14, 15, 16, 17];
 
   const rows = filtered.map(r => {
     const m = mermaBySku[r.sku];
     return [
       r.sku, r.n, r.planta,
       r.fcst, r.alcance,
-      r.riesgo === 'critico' ? 'Crítico' : 'Alerta',
       r.stock, getQuiebreTon(r) || '', r.stock_bloq, r.stock_xlib || '', r.xlib_fecha || '',
       r.stock_transito || '', r.devolucion || '',
       r.vu_cadenas || '', r.vu_kg || '', r.vta_int || '', r.vta_liq || '',
       m ? m.dias : '',
       m ? m.kilos : '',
       m ? (m.nivel === 'critico' ? 'Crítico' : 'Alerta') : '',
-      r.grupo || '', r.cat, cpfrLabel(r.tipo)
+      r.grupo || '', r.cat, cpfrLabel(r.tipo),
+      r.riesgo === 'critico' ? 'Crítico' : 'Alerta'
     ];
   });
 
@@ -407,7 +407,6 @@ function renderRiesgosTable() {
     </td>
     <td class="r"><div style="font-family:var(--cond);font-size:17px;color:var(--dark2)">${r.fcst.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</div></td>
     <td class="r"><div style="font-family:var(--cond);font-size:22px;font-weight:900;color:${col}">${r.alcance.toFixed(1)}</div><div style="font-size:9px;color:var(--muted)">sem</div></td>
-    <td class="r"><span class="chip ${isCrit ? 'c-red' : 'c-amb'}">${isCrit ? '🔴 CRÍTICO' : '🟡 ALERTA'}</span></td>
     <td class="r">${r.stock === 0 ? '<span style="font-size:11px;font-weight:900;color:#C8001E">SIN STOCK</span>' : `<div style="font-family:var(--cond);font-size:17px;font-weight:700;color:var(--dark2)">${r.stock.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</div><div class="tbl-unit">kg disp</div>`}</td>
     <td class="r">${quiebre > 0 ? `<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#C8001E">${quiebre.toLocaleString('es-CL', { minimumFractionDigits: 1 })}</div><div class="tbl-unit">ton</div>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
     <td class="r">${r.stock_bloq > 0 ? `<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#B8860B">${r.stock_bloq.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</div><div class="tbl-unit">kg</div>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
@@ -421,7 +420,8 @@ function renderRiesgosTable() {
     <td class="r">${r.vta_liq > 0 ? `<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#c84000">${r.vta_liq.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</div><div class="tbl-unit">kg</div>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
     <td style="font-size:11px;color:var(--muted);white-space:nowrap">${r.grupo || '<span style="color:var(--muted)">—</span>'}</td>
     <td style="font-size:11px;color:var(--muted)">${r.cat}</td>
-    <td style="font-size:11px;color:var(--muted)">${cpfrLabel(r.tipo)}</td></tr>`;
+    <td style="font-size:11px;color:var(--muted)">${cpfrLabel(r.tipo)}</td>
+    <td class="r"><span class="chip ${isCrit ? 'c-red' : 'c-amb'}">${isCrit ? '🔴 CRÍTICO' : '🟡 ALERTA'}</span></td></tr>`;
   }).join('');
   if (capado) {
     html += `<tr><td colspan="20" style="text-align:center;padding:10px;font-size:11px;color:var(--muted)">Mostrando 50 de ${filtered.length} SKU en riesgo con este filtro — usa <b>⬇ Descargar Excel</b> para ver el listado completo.</td></tr>`;
