@@ -303,15 +303,14 @@ function renderAccionHoy() {
   const listHtml = totalMostrados ? `
     <div style="overflow-x:auto">
     <table class="tbl">
-      <thead><tr><th>#</th><th>Producto</th><th>Planta</th><th class="r">Alcance</th><th class="r">FCST sem</th></tr></thead>
+      <thead><tr><th>SKU</th><th>Producto</th><th class="r">Alcance</th><th class="r">FCST sem</th></tr></thead>
       <tbody>
-      ${itemsFlat.map((r, i) => `<tr>
-        <td style="font-family:var(--cond);font-size:13px;font-weight:800;color:var(--muted2)">${i + 1}</td>
+      ${itemsFlat.map(r => `<tr>
+        <td style="font-size:11px;color:var(--muted);white-space:nowrap">${r.sku}</td>
         <td style="font-weight:600;max-width:220px">
           <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r.n}">${r.n}</div>
-          <div style="font-size:10px;color:var(--muted)">${r.cat}</div>
+          <div style="font-size:10px;color:var(--muted)">${r.cat} · ${r.planta}</div>
         </td>
-        <td><span style="font-size:10px;font-weight:700;background:var(--gray2);padding:2px 8px;border-radius:10px;white-space:nowrap">${r.planta}</span></td>
         <td class="r"><span style="font-family:var(--cond);font-size:18px;font-weight:900;color:#C8001E">${r.alcance.toFixed(1)}</span><div style="font-size:9px;color:var(--muted)">sem</div></td>
         <td class="r"><span style="font-family:var(--cond);font-size:15px;color:var(--dark2)">${r.fcst.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</span></td>
       </tr>`).join('')}
