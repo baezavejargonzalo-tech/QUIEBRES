@@ -407,15 +407,17 @@ function renderRiesgosTable() {
   const rows = capado ? filtered.slice(0, 50) : filtered;
   let html = rows.map((r, i) => {
     const quiebre = getQuiebreTon(r);
-    const isCrit = r.riesgo === 'critico'; const col = isCrit ? '#C8001E' : '#B8860B'; const bp = Math.min((r.alcance / 4) * 100, 100).toFixed(1);
+    const isCrit = r.riesgo === 'critico';
+    const alcCol = r.alcance <= 1 ? '#C8001E' : r.alcance <= 1.5 ? '#B8860B' : '#1a8a3a';
+    const bp = Math.min((r.alcance / 4) * 100, 100).toFixed(1);
     return `<tr><td style="font-family:var(--cond);font-size:13px;font-weight:800;color:var(--muted2)">${i + 1}</td>
     <td style="font-size:11px;color:var(--muted);white-space:nowrap">${r.sku}</td>
     <td style="font-weight:600;max-width:220px">
       <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r.n}">${r.n}</div>
-      <div style="background:var(--gray2);border-radius:3px;height:4px;margin-top:4px"><div style="height:4px;border-radius:3px;width:${bp}%;background:${col}"></div></div>
+      <div style="background:var(--gray2);border-radius:3px;height:4px;margin-top:4px"><div style="height:4px;border-radius:3px;width:${bp}%;background:${alcCol}"></div></div>
     </td>
     <td class="r"><div style="font-family:var(--cond);font-size:17px;color:var(--dark2)">${r.fcst.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</div></td>
-    <td class="r"><div style="font-family:var(--cond);font-size:22px;font-weight:900;color:${col}">${r.alcance.toFixed(1)}</div><div style="font-size:9px;color:var(--muted)">sem</div></td>
+    <td class="r"><div style="font-family:var(--cond);font-size:22px;font-weight:900;color:${alcCol}">${r.alcance.toFixed(1)}</div><div style="font-size:9px;color:var(--muted)">sem</div></td>
     <td class="r">${r.stock === 0 ? '<span style="font-size:11px;font-weight:900;color:#C8001E">SIN STOCK</span>' : `<div style="font-family:var(--cond);font-size:17px;font-weight:700;color:var(--dark2)">${r.stock.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</div><div class="tbl-unit">kg disp</div>`}</td>
     <td class="r">${quiebre > 0 ? `<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#C8001E">${quiebre.toLocaleString('es-CL', { minimumFractionDigits: 1 })}</div><div class="tbl-unit">ton</div>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
     <td class="r">${r.stock_bloq > 0 ? `<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#B8860B">${r.stock_bloq.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</div><div class="tbl-unit">kg</div>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
