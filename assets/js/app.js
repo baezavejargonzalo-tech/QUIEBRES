@@ -293,12 +293,15 @@ function renderAccionHoy() {
     </div>`;
 
   const gruposAccion = ['GRUPO PLF', 'GRUPO QUESOS, UNTABLES Y JUGOS', 'GRUPO FRUTAS Y ACEITES', 'GRUPO LACTEOS Y JUGOS'];
-  const porGrupo = gruposAccion.map(g => {
-    const all = estancados.filter(r => r.grupo === g);
-    return { g, items: all.slice(0, 3), total: all.length };
-  });
+  const filtroGrupoActivo = currentGrupo !== 'all';
+  const porGrupo = filtroGrupoActivo
+    ? [{ g: currentGrupo, items: estancados, total: estancados.length }]
+    : gruposAccion.map(g => {
+        const all = estancados.filter(r => r.grupo === g);
+        return { g, items: all.slice(0, 3), total: all.length };
+      });
   const totalMostrados = porGrupo.reduce((acc, x) => acc + x.items.length, 0);
-  const hayMasPorGrupo = porGrupo.some(x => x.total > 3);
+  const hayMasPorGrupo = !filtroGrupoActivo && porGrupo.some(x => x.total > 3);
   const itemsFlat = porGrupo.flatMap(x => x.items);
   const listHtml = totalMostrados ? `
     <div style="overflow-x:auto">
