@@ -28,7 +28,19 @@ function toggleGrupoFilter(g, checked) {
     currentGrupo = currentGrupo.filter(x => x !== g);
   }
   updateGrupoLabel();
+  updateGrupoTodosCheckbox();
   renderRiesgos();
+}
+function selectTodosGrupos() {
+  currentGrupo = [];
+  document.querySelectorAll('#grupoDropdown .grupo-item-cb').forEach(cb => cb.checked = false);
+  updateGrupoLabel();
+  updateGrupoTodosCheckbox();
+  renderRiesgos();
+}
+function updateGrupoTodosCheckbox() {
+  const cb = document.getElementById('grupoTodosCb');
+  if (cb) cb.checked = currentGrupo.length === 0;
 }
 function updateGrupoLabel() {
   const lbl = document.getElementById('grupoSelLabel');
@@ -67,7 +79,8 @@ function resetFiltros() {
   document.querySelectorAll('.filterbar .tipo-btn').forEach((b, i) => b.classList.toggle('active', i === 0));
   const pSel = document.getElementById('plantaSel');
   if (pSel) pSel.value = 'all';
-  document.querySelectorAll('#grupoDropdown input[type=checkbox]').forEach(cb => cb.checked = false);
+  document.querySelectorAll('#grupoDropdown .grupo-item-cb').forEach(cb => cb.checked = false);
+  updateGrupoTodosCheckbox();
   updateGrupoLabel();
   const cSel = document.getElementById('categoriaSel');
   if (cSel) cSel.value = 'all';
@@ -91,10 +104,15 @@ function initGrupoSelect() {
   if (!dd || dd.dataset.init) return;
   dd.dataset.init = '1';
   const grupos = [...new Set(RIESGOS.map(r => r.grupo))].filter(Boolean).sort();
-  dd.innerHTML = grupos.map(g => `
+  const todosHtml = `
+    <label style="display:flex;align-items:center;gap:8px;padding:6px 8px 10px;border-bottom:1px solid var(--border);margin-bottom:4px;cursor:pointer;font-size:12.5px;font-weight:700;color:var(--dark2);white-space:nowrap">
+      <input type="checkbox" id="grupoTodosCb" checked onchange="if(this.checked){selectTodosGrupos()}else{this.checked=true}">Todos los grupos
+    </label>`;
+  const itemsHtml = grupos.map(g => `
     <label style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:12.5px;color:var(--dark2);white-space:nowrap">
-      <input type="checkbox" value="${g}" onchange="toggleGrupoFilter('${g}', this.checked)">${g}
+      <input type="checkbox" class="grupo-item-cb" value="${g}" onchange="toggleGrupoFilter('${g}', this.checked)">${g}
     </label>`).join('');
+  dd.innerHTML = todosHtml + itemsHtml;
   const btn = document.getElementById('grupoSelBtn');
   if (btn) btn.title = `Filtrar por grupo de marketing (elige uno o varios) — cruzado por SKU con LOGISTICO: ${GRUPO_COVERAGE.con_grupo} de ${GRUPO_COVERAGE.total} SKU en riesgo tienen grupo asignado`;
 }
