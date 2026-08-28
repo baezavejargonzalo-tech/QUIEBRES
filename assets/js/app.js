@@ -495,6 +495,44 @@ function renderRiesgosTable() {
   body.innerHTML = html;
 }
 
+// Riesgo de Merma por Categoría (regla del usuario, distinta de la fecha
+// física de vencimiento): por SKU, el filtro de VU más exigente entre las
+// cadenas (el % más alto). Si al lote le queda VU por encima de ese filtro
+// pero a 6 puntos porcentuales o menos (a punto de caer bajo la cadena más
+// dura), el SKU dispara la alerta — y con 1 solo SKU ya se marca toda su
+// categoría en riesgo. MERMA_CATEGORIA ya viene ordenado por margen
+// ascendente (más urgente primero) desde el ETL. No tiene planta (los
+// lotes se agregan por SKU across todo el país), así que solo respeta
+// Categoría/Búsqueda de los filtros de arriba.
+function renderMermaCategoria() {
+  const el = document.getElementById('mermaCategoriaList');
+  if (!el) return;
+  if (!MERMA_CATEGORIA || !MERMA_CATEGORIA.length) { el.innerHTML = '<p style="color:var(--muted);font-size:13px">Sin categorías en riesgo de merma</p>'; return; }
+  let items = MERMA_CATEGORIA;
+  if (currentCategoria !== 'all') items = items.filter(x => x.cat === currentCategoria);
+  const q = skuSearch.trim().toLowerCase();
+  if (q) items = items.filter(x => x.n.toLowerCase().includes(q));
+  if (!items.length) { el.innerHTML = '<p style="color:var(--muted);font-size:13px;padding:12px 0">Sin categorías en riesgo de merma para este filtro</p>'; return; }
+  const cats = [...new Set(items.map(x => x.cat))];
+  const summary = `<div style="font-size:11px;font-weight:800;color:#B8860B;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🟡 ${cats.length} categoría${cats.length === 1 ? '' : 's'} en riesgo de merma (${items.length} SKU dentro del margen de 6%)</div>`;
+  const table = `
+    <div style="overflow-x:auto">
+    <table class="tbl">
+      <thead><tr><th>SKU</th><th>Producto</th><th>Categoría</th><th class="r">Margen</th><th class="r">Kg en riesgo</th></tr></thead>
+      <tbody>
+      ${items.map(x => `<tr>
+        <td style="font-size:11px;color:var(--muted);white-space:nowrap">${x.sku}</td>
+        <td style="font-weight:600;max-width:260px"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${x.n}">${x.n}</div></td>
+        <td style="font-size:11px;color:var(--muted)">${x.cat}</td>
+        <td class="r"><span style="font-family:var(--cond);font-size:16px;font-weight:800;color:#B8860B">${x.margen_pct.toFixed(1)}</span><div style="font-size:9px;color:var(--muted)">pts</div></td>
+        <td class="r"><span style="font-family:var(--cond);font-size:15px;font-weight:700;color:var(--dark2)">${x.kg.toLocaleString('es-CL')}</span><div style="font-size:9px;color:var(--muted)">kg</div></td>
+      </tr>`).join('')}
+      </tbody>
+    </table>
+    </div>`;
+  el.innerHTML = summary + table;
+}
+
 // Lista de vencimiento de la pestaña Riesgo de Merma (mermando = vencen
 // esta semana, riesgo de merma = 1-4 semanas). Respeta los mismos filtros
 // compartidos de la barra superior (Planta/Categoría/Búsqueda) en vez de
@@ -584,6 +622,7 @@ function renderRiesgos() {
   renderRiesgosSubcat();
   renderRiesgosTable();
 
+  renderMermaCategoria();
   renderMermaVenc();
   renderRiesgoMermaKpis();
 }
