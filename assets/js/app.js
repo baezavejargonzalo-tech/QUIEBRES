@@ -510,6 +510,7 @@ function renderMermaCategoria() {
   if (!MERMA_CATEGORIA || !MERMA_CATEGORIA.length) { el.innerHTML = '<p style="color:var(--muted);font-size:13px">Sin categorías en riesgo de merma</p>'; return; }
   let items = MERMA_CATEGORIA;
   if (currentCategoria !== 'all') items = items.filter(x => x.cat === currentCategoria);
+  if (currentGrupo.length) items = items.filter(x => currentGrupo.includes(x.grupo));
   const q = skuSearch.trim().toLowerCase();
   if (q) items = items.filter(x => x.n.toLowerCase().includes(q));
   if (!items.length) { el.innerHTML = '<p style="color:var(--muted);font-size:13px;padding:12px 0">Sin categorías en riesgo de merma para este filtro</p>'; return; }
@@ -518,13 +519,14 @@ function renderMermaCategoria() {
   const table = `
     <div style="overflow-x:auto">
     <table class="tbl">
-      <thead><tr><th>SKU</th><th>Producto</th><th>Categoría</th><th class="r">Margen</th><th class="r">Kg en riesgo</th></tr></thead>
+      <thead><tr><th>SKU</th><th>Producto</th><th>Categoría</th><th>Grupo de Marketing</th><th class="r">% VU actual</th><th class="r">Kg en riesgo</th></tr></thead>
       <tbody>
       ${items.map(x => `<tr>
         <td style="font-size:11px;color:var(--muted);white-space:nowrap">${x.sku}</td>
         <td style="font-weight:600;max-width:260px"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${x.n}">${x.n}</div></td>
         <td style="font-size:11px;color:var(--muted)">${x.cat}</td>
-        <td class="r"><span style="font-family:var(--cond);font-size:16px;font-weight:800;color:#B8860B">${x.margen_pct.toFixed(1)}</span><div style="font-size:9px;color:var(--muted)">pts</div></td>
+        <td style="font-size:11px;color:var(--muted)">${x.grupo || '<span style="color:var(--muted)">—</span>'}</td>
+        <td class="r"><span style="font-family:var(--cond);font-size:16px;font-weight:800;color:#B8860B">${x.vu_pct.toFixed(1)}%</span></td>
         <td class="r"><span style="font-family:var(--cond);font-size:15px;font-weight:700;color:var(--dark2)">${x.kg.toLocaleString('es-CL')}</span><div style="font-size:9px;color:var(--muted)">kg</div></td>
       </tr>`).join('')}
       </tbody>
