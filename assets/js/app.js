@@ -338,25 +338,27 @@ function exportRiesgosExcel() {
   const mermaBySku = {};
   (MERMA_VENC || []).forEach(m => { mermaBySku[m.sku] = m; });
 
-  const headers = ['SKU', 'Producto', 'Categoría', 'Planta', 'Grupo de Marketing', 'CPFR', 'Estado riesgo',
-    'Stock disponible (kg)', 'Stock XLIB (kg)', 'Fecha liberación XLIB', 'Stock bloqueado (kg)',
+  const headers = ['SKU', 'Producto', 'Categoría', 'CPFR', 'Planta',
+    'FCST semanal (kg)', 'Alcance (sem)', 'Estado riesgo',
+    'Stock disponible (kg)', 'Quiebre (ton)', 'Stock bloqueado (kg)', 'Stock XLIB (kg)', 'Fecha liberación XLIB',
     'Stock tránsito (kg)', 'Devoluciones (ton)', 'Cadenas fuera de filtro VU', 'Kg fuera de filtro VU',
     'Venta Intermedia (kg)', 'Venta Liquidación (kg)',
-    'FCST semanal (kg)', 'Alcance (sem)',
-    'Quiebre (ton)', 'Merma - días a vencer', 'Merma - kg en riesgo', 'Merma - nivel'];
-  const numCols = [7, 8, 10, 11, 12, 14, 15, 16, 17, 18, 19, 20, 21];
+    'Merma - días a vencer', 'Merma - kg en riesgo', 'Merma - nivel', 'Grupo de Marketing'];
+  const numCols = [5, 6, 8, 9, 10, 11, 13, 14, 16, 17, 18, 19, 20];
 
   const rows = filtered.map(r => {
     const m = mermaBySku[r.sku];
     return [
-      r.sku, r.n, r.cat, r.planta, r.grupo || '', cpfrLabel(r.tipo),
+      r.sku, r.n, r.cat, cpfrLabel(r.tipo), r.planta,
+      r.fcst, r.alcance,
       r.riesgo === 'critico' ? 'Crítico' : 'Alerta',
-      r.stock, r.stock_xlib || '', r.xlib_fecha || '', r.stock_bloq, r.stock_transito || '', r.devolucion || '',
-      r.vu_cadenas || '', r.vu_kg || '', r.vta_int || '', r.vta_liq || '', r.fcst, r.alcance,
-      getQuiebreTon(r) || '',
+      r.stock, getQuiebreTon(r) || '', r.stock_bloq, r.stock_xlib || '', r.xlib_fecha || '',
+      r.stock_transito || '', r.devolucion || '',
+      r.vu_cadenas || '', r.vu_kg || '', r.vta_int || '', r.vta_liq || '',
       m ? m.dias : '',
       m ? m.kilos : '',
-      m ? (m.nivel === 'critico' ? 'Crítico' : 'Alerta') : ''
+      m ? (m.nivel === 'critico' ? 'Crítico' : 'Alerta') : '',
+      r.grupo || ''
     ];
   });
 
@@ -391,36 +393,38 @@ function renderRiesgosTable() {
   }
   renderRiesgoCrossFilterNote();
   const filtered = getFilteredRiesgos();
-  if (!filtered.length) { body.innerHTML = '<tr><td colspan="18" style="text-align:center;padding:2rem;color:var(--muted)">Sin datos para este filtro</td></tr>'; return; }
+  if (!filtered.length) { body.innerHTML = '<tr><td colspan="20" style="text-align:center;padding:2rem;color:var(--muted)">Sin datos para este filtro</td></tr>'; return; }
   const capado = ep === 'all' && filtered.length > 50;
   const rows = capado ? filtered.slice(0, 50) : filtered;
   let html = rows.map((r, i) => {
     const quiebre = getQuiebreTon(r);
     const isCrit = r.riesgo === 'critico'; const col = isCrit ? '#C8001E' : '#B8860B'; const bp = Math.min((r.alcance / 4) * 100, 100).toFixed(1);
     return `<tr><td style="font-family:var(--cond);font-size:13px;font-weight:800;color:var(--muted2)">${i + 1}</td>
+    <td style="font-size:11px;color:var(--muted);white-space:nowrap">${r.sku}</td>
     <td style="font-weight:600;max-width:220px">
       <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r.n}">${r.n}</div>
       <div style="background:var(--gray2);border-radius:3px;height:4px;margin-top:4px"><div style="height:4px;border-radius:3px;width:${bp}%;background:${col}"></div></div>
     </td>
     <td style="font-size:11px;color:var(--muted)">${r.cat}</td>
     <td style="font-size:11px;color:var(--muted)">${cpfrLabel(r.tipo)}</td>
+    <td class="r"><div style="font-family:var(--cond);font-size:17px;color:var(--dark2)">${r.fcst.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</div></td>
+    <td class="r"><div style="font-family:var(--cond);font-size:22px;font-weight:900;color:${col}">${r.alcance.toFixed(1)}</div><div style="font-size:9px;color:var(--muted)">sem</div></td>
+    <td class="r"><span class="chip ${isCrit ? 'c-red' : 'c-amb'}">${isCrit ? '🔴 CRÍTICO' : '🟡 ALERTA'}</span></td>
     <td class="r">${r.stock === 0 ? '<span style="font-size:11px;font-weight:900;color:#C8001E">SIN STOCK</span>' : `<div style="font-family:var(--cond);font-size:17px;font-weight:700;color:var(--dark2)">${r.stock.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</div><div class="tbl-unit">kg disp</div>`}</td>
+    <td class="r">${quiebre > 0 ? `<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#C8001E">${quiebre.toLocaleString('es-CL', { minimumFractionDigits: 1 })}</div><div class="tbl-unit">ton</div>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
     <td class="r">${r.stock_bloq > 0 ? `<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#B8860B">${r.stock_bloq.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</div><div class="tbl-unit">kg</div>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
     <td class="r">${r.stock_xlib > 0 ? `<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#2D5BE3">${r.stock_xlib.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</div><div class="tbl-unit">kg</div>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
     <td class="r" style="font-size:11px;color:#2D5BE3;white-space:nowrap">${r.xlib_fecha || '<span style="color:var(--muted)">—</span>'}</td>
     <td class="r">${r.stock_transito > 0 ? `<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#7A5AA0">${r.stock_transito.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</div><div class="tbl-unit">kg</div>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
     <td class="r">${r.devolucion > 0 ? `<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#a03050">${r.devolucion.toLocaleString('es-CL', { minimumFractionDigits: 2 })}</div><div class="tbl-unit">ton</div>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
-    <td class="r">${quiebre > 0 ? `<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#C8001E">${quiebre.toLocaleString('es-CL', { minimumFractionDigits: 1 })}</div><div class="tbl-unit">ton</div>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
     <td style="font-size:10.5px;color:#C8001E;font-weight:600;max-width:160px">${r.vu_cadenas || '<span style="color:var(--muted);font-weight:400">—</span>'}</td>
     <td class="r">${r.vu_kg > 0 ? `<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#C8001E">${r.vu_kg.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</div><div class="tbl-unit">kg</div>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
     <td class="r">${r.vta_int > 0 ? `<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#7A5A10">${r.vta_int.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</div><div class="tbl-unit">kg</div>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
     <td class="r">${r.vta_liq > 0 ? `<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#c84000">${r.vta_liq.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</div><div class="tbl-unit">kg</div>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
-    <td class="r"><div style="font-family:var(--cond);font-size:17px;color:var(--dark2)">${r.fcst.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</div></td>
-    <td class="r"><div style="font-family:var(--cond);font-size:22px;font-weight:900;color:${col}">${r.alcance.toFixed(1)}</div><div style="font-size:9px;color:var(--muted)">sem</div></td>
-    <td class="r"><span class="chip ${isCrit ? 'c-red' : 'c-amb'}">${isCrit ? '🔴 CRÍTICO' : '🟡 ALERTA'}</span></td></tr>`;
+    <td style="font-size:11px;color:var(--muted);white-space:nowrap">${r.grupo || '<span style="color:var(--muted)">—</span>'}</td></tr>`;
   }).join('');
   if (capado) {
-    html += `<tr><td colspan="18" style="text-align:center;padding:10px;font-size:11px;color:var(--muted)">Mostrando 50 de ${filtered.length} SKU en riesgo con este filtro — usa <b>⬇ Descargar Excel</b> para ver el listado completo.</td></tr>`;
+    html += `<tr><td colspan="20" style="text-align:center;padding:10px;font-size:11px;color:var(--muted)">Mostrando 50 de ${filtered.length} SKU en riesgo con este filtro — usa <b>⬇ Descargar Excel</b> para ver el listado completo.</td></tr>`;
   }
   body.innerHTML = html;
 }
