@@ -123,16 +123,17 @@
         <button onclick="filterRiesgos('critico',this)" class="rpill" style="font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;border:1.5px solid #ddd;background:#fff;color:#555;cursor:pointer">🔴 Críticos</button>
         <button onclick="filterRiesgos('alerta',this)" class="rpill" style="font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;border:1.5px solid #ddd;background:#fff;color:#555;cursor:pointer">🟡 Alertas</button>
         <div style="width:1px;height:18px;background:var(--border);margin:0 2px"></div>
-        <button onclick="exportRiesgosExcel()" title="Incluye estado de riesgo, stock disponible/bloqueado/XLIB/tránsito, FCST semanal, alcance, devoluciones, quiebre y merma (cuando el dato existe)" style="font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;border:1.5px solid #1A5276;background:#eaf4fb;color:#1A5276;cursor:pointer">⬇ Descargar Excel</button>
+        <button onclick="exportRiesgosExcel()" title="Incluye estado de riesgo, stock disponible/bloqueado/XLIB/tránsito, FCST semanal, alcance, devoluciones, filtro de VU por cadena, quiebre y merma (cuando el dato existe)" style="font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;border:1.5px solid #1A5276;background:#eaf4fb;color:#1A5276;cursor:pointer">⬇ Descargar Excel</button>
       </div>
     </div>
     <div id="riesgoCrossFilterNote" style="display:none;font-size:12px;color:var(--muted);margin:-4px 0 12px"></div>
     <div style="overflow-x:auto">
-    <table class="tbl" style="min-width:1320px">
+    <table class="tbl" style="min-width:1620px">
       <thead><tr><th>#</th><th>Producto</th><th>Categoría</th><th>CPFR</th>
         <th class="r">Stock Disp</th><th class="r" style="white-space:nowrap">Bloqueado (kg)</th>
         <th class="r" style="white-space:nowrap">XLIB (kg)</th><th class="r" style="white-space:nowrap">Fecha XLIB</th>
         <th class="r" style="white-space:nowrap">Tránsito (kg)</th><th class="r" style="white-space:nowrap">Devoluciones (ton)</th>
+        <th style="white-space:nowrap">Cadenas fuera de filtro VU</th><th class="r" style="white-space:nowrap">Kg fuera de filtro VU</th>
         <th class="r">FCST Sem</th><th class="r">Alcance</th><th class="r">Estado</th></tr></thead>
       <tbody id="riesgosBody"></tbody>
     </table></div>
