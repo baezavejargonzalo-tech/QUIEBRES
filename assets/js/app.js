@@ -325,9 +325,10 @@ function exportRiesgosExcel() {
   const headers = ['SKU', 'Producto', 'Categoría', 'Planta', 'Grupo de Marketing', 'CPFR', 'Estado riesgo',
     'Stock disponible (kg)', 'Stock XLIB (kg)', 'Fecha liberación XLIB', 'Stock bloqueado (kg)',
     'Stock tránsito (kg)', 'Devoluciones (ton)', 'Cadenas fuera de filtro VU', 'Kg fuera de filtro VU',
+    'Venta Intermedia (kg)', 'Venta Liquidación (kg)',
     'FCST semanal (kg)', 'Alcance (sem)',
     'Quiebre (ton)', 'Merma - días a vencer', 'Merma - kg en riesgo', 'Merma - nivel'];
-  const numCols = [7, 8, 10, 11, 12, 14, 15, 16, 17, 18, 19];
+  const numCols = [7, 8, 10, 11, 12, 14, 15, 16, 17, 18, 19, 20, 21];
 
   const rows = filtered.map(r => {
     const q = quiebreByName[r.n.toUpperCase().trim()];
@@ -336,7 +337,7 @@ function exportRiesgosExcel() {
       r.sku, r.n, r.cat, r.planta, r.grupo || '', cpfrLabel(r.tipo),
       r.riesgo === 'critico' ? 'Crítico' : 'Alerta',
       r.stock, r.stock_xlib || '', r.xlib_fecha || '', r.stock_bloq, r.stock_transito || '', r.devolucion || '',
-      r.vu_cadenas || '', r.vu_kg || '', r.fcst, r.alcance,
+      r.vu_cadenas || '', r.vu_kg || '', r.vta_int || '', r.vta_liq || '', r.fcst, r.alcance,
       q !== undefined ? q : '',
       m ? m.dias : '',
       m ? m.kilos : '',
@@ -375,7 +376,7 @@ function renderRiesgosTable() {
   }
   renderRiesgoCrossFilterNote();
   const filtered = getFilteredRiesgos();
-  if (!filtered.length) { body.innerHTML = '<tr><td colspan="15" style="text-align:center;padding:2rem;color:var(--muted)">Sin datos para este filtro</td></tr>'; return; }
+  if (!filtered.length) { body.innerHTML = '<tr><td colspan="17" style="text-align:center;padding:2rem;color:var(--muted)">Sin datos para este filtro</td></tr>'; return; }
   const capado = ep === 'all' && filtered.length > 50;
   const rows = capado ? filtered.slice(0, 50) : filtered;
   let html = rows.map((r, i) => {
@@ -395,12 +396,14 @@ function renderRiesgosTable() {
     <td class="r">${r.devolucion > 0 ? `<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#a03050">${r.devolucion.toLocaleString('es-CL', { minimumFractionDigits: 2 })}</div><div class="tbl-unit">ton</div>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
     <td style="font-size:10.5px;color:#C8001E;font-weight:600;max-width:160px">${r.vu_cadenas || '<span style="color:var(--muted);font-weight:400">—</span>'}</td>
     <td class="r">${r.vu_kg > 0 ? `<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#C8001E">${r.vu_kg.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</div><div class="tbl-unit">kg</div>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
+    <td class="r">${r.vta_int > 0 ? `<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#7A5A10">${r.vta_int.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</div><div class="tbl-unit">kg</div>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
+    <td class="r">${r.vta_liq > 0 ? `<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#c84000">${r.vta_liq.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</div><div class="tbl-unit">kg</div>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
     <td class="r"><div style="font-family:var(--cond);font-size:17px;color:var(--dark2)">${r.fcst.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</div></td>
     <td class="r"><div style="font-family:var(--cond);font-size:22px;font-weight:900;color:${col}">${r.alcance.toFixed(1)}</div><div style="font-size:9px;color:var(--muted)">sem</div></td>
     <td class="r"><span class="chip ${isCrit ? 'c-red' : 'c-amb'}">${isCrit ? '🔴 CRÍTICO' : '🟡 ALERTA'}</span></td></tr>`;
   }).join('');
   if (capado) {
-    html += `<tr><td colspan="15" style="text-align:center;padding:10px;font-size:11px;color:var(--muted)">Mostrando 50 de ${filtered.length} SKU en riesgo con este filtro — usa <b>⬇ Descargar Excel</b> para ver el listado completo.</td></tr>`;
+    html += `<tr><td colspan="17" style="text-align:center;padding:10px;font-size:11px;color:var(--muted)">Mostrando 50 de ${filtered.length} SKU en riesgo con este filtro — usa <b>⬇ Descargar Excel</b> para ver el listado completo.</td></tr>`;
   }
   body.innerHTML = html;
 }
