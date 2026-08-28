@@ -79,13 +79,9 @@
 </div>
 
 <section>
-  <!-- ── EXPLICACIÓN DEL MODELO ── -->
+  <!-- ── TOGGLE QUIEBRE / MERMA ── -->
   <div class="panel" style="margin-bottom:14px;background:var(--gray);border-style:dashed">
-    <div style="font-size:13px;color:var(--dark2);line-height:1.55">
-      Este reporte separa dos riesgos con lógicas distintas: <b>quiebre</b> (falta de stock, especialmente grave en Abarrotes, que debe mantener stock de seguridad) y <b>merma</b> (exceso de stock que puede vencer antes de venderse, especialmente relevante en Refrigerados / PLF / Quesos). Son dos preguntas de negocio distintas — no un solo semáforo.
-      <div style="font-size:11.5px;color:var(--muted);margin-top:6px">⚠️ Nota: lo de abajo refleja el <b>estado actual</b> (una foto al 27-ago-2026), no una proyección. Para anticipar cuándo ocurrirá un quiebre o una merma se necesita historial semanal de stock por SKU, que este archivo no trae todavía — hoy solo trae el quiebre ya ocurrido y una foto del stock actual.</div>
-    </div>
-    <div style="display:flex;gap:10px;margin-top:14px">
+    <div style="display:flex;gap:10px">
       <button id="rfut-btn-quiebre" class="rpill active" onclick="setRiesgoFutTab('quiebre',this)"
         style="font-size:12.5px;font-weight:800;padding:8px 18px;border-radius:20px;border:1.5px solid #C8001E;background:#C8001E;color:#fff;cursor:pointer">🔴 Riesgo de Quiebre</button>
       <button id="rfut-btn-merma" class="rpill" onclick="setRiesgoFutTab('merma',this)"
