@@ -393,9 +393,10 @@ function exportRiesgosExcel() {
     'FCST semanal (kg)', 'Alcance (sem)',
     'Stock disponible (kg)', 'Quiebre (ton)', 'Stock bloqueado (kg)', 'Stock XLIB (kg)', 'Fecha liberación XLIB',
     'Stock tránsito (kg)', 'Devoluciones (ton)', 'Cadenas fuera de filtro VU', 'Kg fuera de filtro VU',
+    'Cadenas por vencer VU', 'Kg por vencer VU', 'Días para vencer VU',
     'Venta Intermedia (kg)', 'Venta Liquidación (kg)',
     'Merma - días a vencer', 'Merma - kg en riesgo', 'Merma - nivel', 'Grupo de Marketing', 'Categoría', 'CPFR', 'Estado riesgo'];
-  const numCols = [3, 4, 5, 6, 7, 8, 10, 11, 13, 14, 15, 16, 17];
+  const numCols = [3, 4, 5, 6, 7, 8, 10, 11, 13, 15, 16, 17, 18, 19, 20];
 
   const rows = filtered.map(r => {
     const m = mermaBySku[r.sku];
@@ -404,7 +405,9 @@ function exportRiesgosExcel() {
       r.fcst, r.alcance,
       r.stock, getQuiebreTon(r) || '', r.stock_bloq, r.stock_xlib || '', r.xlib_fecha || '',
       r.stock_transito || '', r.devolucion || '',
-      r.vu_cadenas || '', r.vu_kg || '', r.vta_int || '', r.vta_liq || '',
+      r.vu_cadenas || '', r.vu_kg || '',
+      r.vu_alerta_cadenas || '', r.vu_alerta_kg || '', r.vu_alerta_dias != null ? r.vu_alerta_dias : '',
+      r.vta_int || '', r.vta_liq || '',
       m ? m.dias : '',
       m ? m.kilos : '',
       m ? (m.nivel === 'critico' ? 'Crítico' : 'Alerta') : '',
@@ -444,7 +447,7 @@ function renderRiesgosTable() {
   }
   renderRiesgoCrossFilterNote();
   const filtered = getFilteredRiesgos();
-  if (!filtered.length) { body.innerHTML = '<tr><td colspan="20" style="text-align:center;padding:2rem;color:var(--muted)">Sin datos para este filtro</td></tr>'; return; }
+  if (!filtered.length) { body.innerHTML = '<tr><td colspan="23" style="text-align:center;padding:2rem;color:var(--muted)">Sin datos para este filtro</td></tr>'; return; }
   const capado = ep === 'all' && filtered.length > 50;
   const rows = capado ? filtered.slice(0, 50) : filtered;
   let html = rows.map((r, i) => {
@@ -469,6 +472,9 @@ function renderRiesgosTable() {
     <td class="r">${r.devolucion > 0 ? `<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#a03050">${r.devolucion.toLocaleString('es-CL', { minimumFractionDigits: 2 })}</div><div class="tbl-unit">ton</div>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
     <td style="font-size:10.5px;color:#C8001E;font-weight:600;max-width:160px">${r.vu_cadenas || '<span style="color:var(--muted);font-weight:400">—</span>'}</td>
     <td class="r">${r.vu_kg > 0 ? `<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#C8001E">${r.vu_kg.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</div><div class="tbl-unit">kg</div>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
+    <td style="font-size:10.5px;color:#B8860B;font-weight:600;max-width:160px">${r.vu_alerta_cadenas || '<span style="color:var(--muted);font-weight:400">—</span>'}</td>
+    <td class="r">${r.vu_alerta_kg > 0 ? `<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#B8860B">${r.vu_alerta_kg.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</div><div class="tbl-unit">kg</div>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
+    <td class="r">${r.vu_alerta_dias != null ? `<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#B8860B">${r.vu_alerta_dias}</div><div class="tbl-unit">días</div>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
     <td class="r">${r.vta_int > 0 ? `<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#7A5A10">${r.vta_int.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</div><div class="tbl-unit">kg</div>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
     <td class="r">${r.vta_liq > 0 ? `<div style="font-family:var(--cond);font-size:15px;font-weight:700;color:#c84000">${r.vta_liq.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</div><div class="tbl-unit">kg</div>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
     <td style="font-size:11px;color:var(--muted);white-space:nowrap">${r.grupo || '<span style="color:var(--muted)">—</span>'}</td>
@@ -477,7 +483,7 @@ function renderRiesgosTable() {
     <td class="r"><span class="chip ${isCrit ? 'c-red' : 'c-amb'}">${isCrit ? '🔴 CRÍTICO' : '🟡 ALERTA'}</span></td></tr>`;
   }).join('');
   if (capado) {
-    html += `<tr><td colspan="20" style="text-align:center;padding:10px;font-size:11px;color:var(--muted)">Mostrando 50 de ${filtered.length} SKU en riesgo con este filtro — usa <b>⬇ Descargar Excel</b> para ver el listado completo.</td></tr>`;
+    html += `<tr><td colspan="23" style="text-align:center;padding:10px;font-size:11px;color:var(--muted)">Mostrando 50 de ${filtered.length} SKU en riesgo con este filtro — usa <b>⬇ Descargar Excel</b> para ver el listado completo.</td></tr>`;
   }
   body.innerHTML = html;
 }
