@@ -292,33 +292,42 @@ function renderAccionHoy() {
       </div>
     </div>`;
 
-  const top10 = estancados.slice(0, 10);
-  const listHtml = top10.length ? `
+  const gruposAccion = ['GRUPO PLF', 'GRUPO QUESOS, UNTABLES Y JUGOS', 'GRUPO FRUTAS Y ACEITES', 'GRUPO LACTEOS Y JUGOS'];
+  const porGrupo = gruposAccion.map(g => {
+    const all = estancados.filter(r => r.grupo === g);
+    return { g, items: all.slice(0, 3), total: all.length };
+  });
+  const totalMostrados = porGrupo.reduce((acc, x) => acc + x.items.length, 0);
+  const hayMasPorGrupo = porGrupo.some(x => x.total > 3);
+  const listHtml = totalMostrados ? `
     <div style="overflow-x:auto">
     <table class="tbl">
       <thead><tr><th>#</th><th>Producto</th><th>Planta</th><th class="r">Alcance</th><th class="r">FCST sem</th></tr></thead>
       <tbody>
-      ${top10.map((r, i) => `<tr>
+      ${porGrupo.map(({ g, items }) => `
+        <tr><td colspan="5" style="background:var(--gray2);font-size:10.5px;font-weight:800;color:var(--dark2);text-transform:uppercase;letter-spacing:.4px;padding:6px 10px">${g}</td></tr>
+        ${items.length ? items.map((r, i) => `<tr>
         <td style="font-family:var(--cond);font-size:13px;font-weight:800;color:var(--muted2)">${i + 1}</td>
         <td style="font-weight:600;max-width:220px">
           <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r.n}">${r.n}</div>
-          <div style="font-size:10px;color:var(--muted)">${r.cat}${r.grupo ? ' · ' + r.grupo : ''}</div>
+          <div style="font-size:10px;color:var(--muted)">${r.cat}</div>
         </td>
         <td><span style="font-size:10px;font-weight:700;background:var(--gray2);padding:2px 8px;border-radius:10px;white-space:nowrap">${r.planta}</span></td>
         <td class="r"><span style="font-family:var(--cond);font-size:18px;font-weight:900;color:#C8001E">${r.alcance.toFixed(1)}</span><div style="font-size:9px;color:var(--muted)">sem</div></td>
         <td class="r"><span style="font-family:var(--cond);font-size:15px;color:var(--dark2)">${r.fcst.toLocaleString('es-CL', { minimumFractionDigits: 0 })}</span></td>
-      </tr>`).join('')}
+      </tr>`).join('') : `<tr><td colspan="5" style="padding:8px 10px;font-size:11px;color:var(--muted)">Sin críticos estancados en este grupo con este filtro</td></tr>`}
+      `).join('')}
       </tbody>
     </table>
     </div>
-    ${estancados.length > 10 ? `<div style="text-align:center;padding:8px 0 0;font-size:11px;color:var(--muted)">Mostrando 10 de ${estancados.length} — usa los filtros de arriba para acotar, o descarga el Excel (Top 50) para ver el resto.</div>` : ''}
+    ${hayMasPorGrupo ? `<div style="text-align:center;padding:8px 0 0;font-size:11px;color:var(--muted)">Mostrando 3 por grupo — usa los filtros de arriba o descarga el Excel (Top 50) para ver el listado completo por grupo.</div>` : ''}
   ` : `<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">✅ Ningún SKU crítico está estancado con este filtro</div>`;
 
   el.innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1.3fr;gap:14px;align-items:stretch">
       <div>${cardsHtml}</div>
       <div class="panel" style="padding:16px 18px;margin:0">
-        <div class="panel-title" style="margin-bottom:10px">🚨 Top 10 · Críticos sin fecha de recuperación</div>
+        <div class="panel-title" style="margin-bottom:10px">🚨 Críticos sin fecha de recuperación · 3 por grupo</div>
         ${listHtml}
       </div>
     </div>`;
