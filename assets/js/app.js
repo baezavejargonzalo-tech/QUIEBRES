@@ -500,6 +500,11 @@ function renderRiesgosTable() {
 // de % de vida útil ya consumida. No tiene planta/categoría por fila útil
 // para filtrar — es un total país, complementario al detalle preciso de
 // Riesgo de Merma por Categoría.
+let _stockVucSelected = null;
+function toggleStockVucBucket(bucket) {
+  _stockVucSelected = _stockVucSelected === bucket ? null : bucket;
+  renderStockVuc();
+}
 function renderStockVuc() {
   const el = document.getElementById('stockVucChart');
   if (!el || !STOCK_VUC || !STOCK_VUC.length) { if (el) el.innerHTML = '<p style="color:var(--muted);font-size:13px">Sin datos de VU consumida disponibles</p>'; return; }
@@ -507,16 +512,42 @@ function renderStockVuc() {
   const items = STOCK_VUC.filter(x => x.bucket !== 'INDEFINIDO');
   const indefinido = STOCK_VUC.find(x => x.bucket === 'INDEFINIDO');
   const maxV = Math.max(...items.map(x => x.kg));
-  el.innerHTML = items.map(x => {
+  const bars = items.map(x => {
     const col = PAL[x.bucket] || '#555';
     const pct = maxV > 0 ? (x.kg / maxV * 100).toFixed(1) : 0;
-    return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:11px">
-      <div style="min-width:70px;font-size:11px;font-weight:700;color:var(--dark2)">${x.bucket}</div>
+    const active = _stockVucSelected === x.bucket;
+    return `<div onclick="toggleStockVucBucket('${x.bucket}')" style="display:flex;align-items:center;gap:10px;margin-bottom:11px;cursor:pointer;border-radius:6px;padding:3px 6px;margin-left:-6px;background:${active ? 'var(--gray)' : 'transparent'}">
+      <div style="min-width:70px;font-size:11px;font-weight:700;color:${active ? col : 'var(--dark2)'}">${x.bucket}${active ? ' ▾' : ''}</div>
       <div style="flex:1;background:var(--gray2);border-radius:4px;height:10px">
         <div style="height:10px;border-radius:4px;width:${pct}%;background:${col};transition:width .4s"></div></div>
       <div style="text-align:right;min-width:110px"><span style="font-family:var(--cond);font-size:17px;font-weight:800;color:${col}">${x.kg.toLocaleString('es-CL', { maximumFractionDigits: 0 })}</span>
         <span style="font-size:9px;color:var(--muted);margin-left:2px">kg</span></div></div>`;
-  }).join('') + (indefinido ? `<div style="font-size:11px;color:var(--muted);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">Sin dato de VU asignado: ${indefinido.kg.toLocaleString('es-CL', { maximumFractionDigits: 0 })} kg (no incluido en el gráfico)</div>` : '');
+  }).join('');
+  const nota = indefinido ? `<div style="font-size:11px;color:var(--muted);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">Sin dato de VU asignado: ${indefinido.kg.toLocaleString('es-CL', { maximumFractionDigits: 0 })} kg (no incluido en el gráfico)</div>` : '';
+  let detalle = '';
+  if (_stockVucSelected) {
+    const skus = (STOCK_VUC_SKUS || []).filter(x => x.bucket === _stockVucSelected);
+    const col = PAL[_stockVucSelected] || '#555';
+    detalle = `
+      <div style="margin-top:14px;padding-top:14px;border-top:1.5px solid var(--border)">
+        <div style="font-size:11px;font-weight:800;color:${col};text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">SKU en rango ${_stockVucSelected} (${skus.length})</div>
+        <div style="overflow-x:auto;max-height:360px;overflow-y:auto">
+        <table class="tbl">
+          <thead><tr><th>SKU</th><th>Producto</th><th>Categoría</th><th>Planta</th><th class="r">Kg</th></tr></thead>
+          <tbody>
+          ${skus.map(x => `<tr>
+            <td style="font-size:11px;color:var(--muted);white-space:nowrap">${x.sku}</td>
+            <td style="font-weight:600;max-width:260px"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${x.n}">${x.n}</div></td>
+            <td style="font-size:11px;color:var(--muted)">${x.cat || '—'}</td>
+            <td style="font-size:11px;color:var(--muted);white-space:nowrap">${x.planta || '—'}</td>
+            <td class="r"><span style="font-family:var(--cond);font-size:15px;font-weight:700;color:var(--dark2)">${x.kg.toLocaleString('es-CL')}</span><div style="font-size:9px;color:var(--muted)">kg</div></td>
+          </tr>`).join('')}
+          </tbody>
+        </table>
+        </div>
+      </div>`;
+  }
+  el.innerHTML = bars + nota + detalle;
 }
 
 // Riesgo de Merma por Categoría (regla del usuario, distinta de la fecha
