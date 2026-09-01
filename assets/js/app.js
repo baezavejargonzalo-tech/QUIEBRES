@@ -140,8 +140,8 @@ function setRiesgSem(v) {
 }
 
 // Quiebre (ton) de un SKU para la "Semana quiebres" seleccionada arriba.
-// 'all' usa el total S31-S35 ya calculado en RIESGOS; un mes (ej. 'Ago')
-// suma las semanas de ese mes; una semana puntual (ej. 'S31') usa solo esa.
+// 'all' usa el total de semanas ya calculado en RIESGOS; un mes (ej. 'Ago')
+// suma las semanas de ese mes; una semana puntual (ej. 'S34') usa solo esa.
 function getQuiebreTon(r) {
   if (riesgsSem === 'all') return r.quiebre_ton || 0;
   const bySem = QUIEBRE_SKU_SEM[r.sku];
@@ -295,7 +295,7 @@ function renderRiesgoCrossFilterNote() {
     html += `${html ? '<br>' : ''}📍 Mostrando el detalle <b>completo</b> de ${currentPlanta}: sus ${totalPlanta} SKU en riesgo (crítico + alerta).`;
   }
   if (riesgsSem !== 'all') {
-    html += `${html ? '<br>' : ''}📅 La columna <b>Quiebre (ton)</b> muestra solo ${MES_MAP[riesgsSem] ? 'el mes' : 'la semana'} <b>${riesgsSem}</b> (seleccionado en "Semana quiebres" más arriba), no el total S31-S35.`;
+    html += `${html ? '<br>' : ''}📅 La columna <b>Quiebre (ton)</b> muestra solo ${MES_MAP[riesgsSem] ? 'el mes' : 'la semana'} <b>${riesgsSem}</b> (seleccionado en "Semana quiebres" más arriba), no el total de todas las semanas.`;
   }
   if (html) { el.style.display = ''; el.innerHTML = html; } else { el.style.display = 'none'; }
 }
@@ -495,6 +495,30 @@ function renderRiesgosTable() {
   body.innerHTML = html;
 }
 
+// Stock por rango de VU consumida (archivo "Stock x VUC"): vista rápida
+// de cuánto stock (kg) está fresco vs. cerca de vencer, en 8 rangos fijos
+// de % de vida útil ya consumida. No tiene planta/categoría por fila útil
+// para filtrar — es un total país, complementario al detalle preciso de
+// Riesgo de Merma por Categoría.
+function renderStockVuc() {
+  const el = document.getElementById('stockVucChart');
+  if (!el || !STOCK_VUC || !STOCK_VUC.length) { if (el) el.innerHTML = '<p style="color:var(--muted);font-size:13px">Sin datos de VU consumida disponibles</p>'; return; }
+  const PAL = { '<=20%': '#1a8a3a', '20-25%': '#5a9e2f', '25-33%': '#8ea82a', '33-40%': '#b8a020', '40-50%': '#c8860b', '50-75%': '#c86a10', '75-99%': '#c84000', '>=100%': '#C8001E', 'INDEFINIDO': '#999' };
+  const items = STOCK_VUC.filter(x => x.bucket !== 'INDEFINIDO');
+  const indefinido = STOCK_VUC.find(x => x.bucket === 'INDEFINIDO');
+  const maxV = Math.max(...items.map(x => x.kg));
+  el.innerHTML = items.map(x => {
+    const col = PAL[x.bucket] || '#555';
+    const pct = maxV > 0 ? (x.kg / maxV * 100).toFixed(1) : 0;
+    return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:11px">
+      <div style="min-width:70px;font-size:11px;font-weight:700;color:var(--dark2)">${x.bucket}</div>
+      <div style="flex:1;background:var(--gray2);border-radius:4px;height:10px">
+        <div style="height:10px;border-radius:4px;width:${pct}%;background:${col};transition:width .4s"></div></div>
+      <div style="text-align:right;min-width:110px"><span style="font-family:var(--cond);font-size:17px;font-weight:800;color:${col}">${x.kg.toLocaleString('es-CL', { maximumFractionDigits: 0 })}</span>
+        <span style="font-size:9px;color:var(--muted);margin-left:2px">kg</span></div></div>`;
+  }).join('') + (indefinido ? `<div style="font-size:11px;color:var(--muted);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">Sin dato de VU asignado: ${indefinido.kg.toLocaleString('es-CL', { maximumFractionDigits: 0 })} kg (no incluido en el gráfico)</div>` : '');
+}
+
 // Riesgo de Merma por Categoría (regla del usuario, distinta de la fecha
 // física de vencimiento): por SKU, el filtro de VU más exigente entre las
 // cadenas (el % más alto). Si al lote le queda VU por encima de ese filtro
@@ -625,6 +649,7 @@ function renderRiesgos() {
   renderRiesgosTable();
 
   renderMermaCategoria();
+  renderStockVuc();
   renderMermaVenc();
   renderRiesgoMermaKpis();
 }
