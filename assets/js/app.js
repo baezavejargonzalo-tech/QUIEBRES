@@ -438,6 +438,48 @@ function exportRiesgosExcel() {
   URL.revokeObjectURL(url);
 }
 
+// Exporta la tabla de Riesgo de Merma por Categoría — mismos filtros
+// (Categoría/Grupo/Búsqueda) y columnas que se ven en pantalla.
+function exportMermaCategoriaExcel() {
+  let items = MERMA_CATEGORIA || [];
+  if (currentCategoria !== 'all') items = items.filter(x => x.cat === currentCategoria);
+  if (currentGrupo.length) items = items.filter(x => currentGrupo.includes(x.grupo));
+  const q = skuSearch.trim().toLowerCase();
+  if (q) items = items.filter(x => x.n.toLowerCase().includes(q));
+  if (!items.length) { alert('No hay filas para exportar con este filtro.'); return; }
+
+  const headers = ['SKU', 'Producto', 'Categoría', 'Grupo de Marketing',
+    'Cadena más exigente', '% Aceptación exigida', '% VU avanzada', 'Kg en riesgo', 'Advertencia'];
+  const numCols = [5, 6, 7];
+
+  const rows = items.map(x => [
+    x.sku, x.n, x.cat, x.grupo || '',
+    x.cadena_exigente, x.pct_aceptacion, x.vu_avance_pct, x.kg,
+    `A ${x.margen_pct.toFixed(1)}% de salir de ${x.cadena_exigente}`
+  ]);
+
+  const escCsv = v => {
+    if (v === null || v === undefined || v === '') return '';
+    const s = String(v).replace(/"/g, '""');
+    return /[;"\n]/.test(s) ? `"${s}"` : s;
+  };
+  const cellCsv = (v, i) => numCols.includes(i) && typeof v === 'number' ? String(v).replace('.', ',') : escCsv(v);
+
+  const lines = [headers.map(escCsv).join(';')];
+  rows.forEach(row => lines.push(row.map(cellCsv).join(';')));
+
+  const csv = '﻿' + lines.join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `riesgo_merma_categoria_${currentCategoria}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 function renderRiesgosTable() {
   const body = document.getElementById('riesgosBody'); if (!body) return;
   const tituloEl = document.getElementById('riesgosTablaTitulo');
