@@ -257,7 +257,7 @@ function filterRiesgosBase(list) {
   if (currentGrupo.length) filtered = filtered.filter(r => currentGrupo.includes(r.grupo));
   if (currentCategoria !== 'all') filtered = filtered.filter(r => r.cat === currentCategoria);
   const q = skuSearch.trim().toLowerCase();
-  if (q) filtered = filtered.filter(r => r.n.toLowerCase().includes(q));
+  if (q) filtered = filtered.filter(r => r.n.toLowerCase().includes(q) || String(r.sku).toLowerCase().includes(q));
   return filtered;
 }
 function getFilteredRiesgos() {
@@ -445,7 +445,7 @@ function exportMermaCategoriaExcel() {
   if (currentCategoria !== 'all') items = items.filter(x => x.cat === currentCategoria);
   if (currentGrupo.length) items = items.filter(x => currentGrupo.includes(x.grupo));
   const q = skuSearch.trim().toLowerCase();
-  if (q) items = items.filter(x => x.n.toLowerCase().includes(q));
+  if (q) items = items.filter(x => x.n.toLowerCase().includes(q) || String(x.sku).toLowerCase().includes(q));
   if (!items.length) { alert('No hay filas para exportar con este filtro.'); return; }
 
   const headers = ['SKU', 'Producto', 'Categoría', 'Grupo de Marketing',
@@ -609,7 +609,7 @@ function renderMermaCategoria() {
   if (currentCategoria !== 'all') items = items.filter(x => x.cat === currentCategoria);
   if (currentGrupo.length) items = items.filter(x => currentGrupo.includes(x.grupo));
   const q = skuSearch.trim().toLowerCase();
-  if (q) items = items.filter(x => x.n.toLowerCase().includes(q));
+  if (q) items = items.filter(x => x.n.toLowerCase().includes(q) || String(x.sku).toLowerCase().includes(q));
   if (!items.length) { el.innerHTML = '<p style="color:var(--muted);font-size:13px;padding:12px 0">Sin categorías en riesgo de merma para este filtro</p>'; return; }
   const cats = [...new Set(items.map(x => x.cat))];
   const summary = `<div style="font-size:11px;font-weight:800;color:#B8860B;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🟡 ${cats.length} categoría${cats.length === 1 ? '' : 's'} en riesgo de merma (${items.length} SKU dentro del margen de 6%)</div>`;
@@ -656,7 +656,7 @@ function renderMermaVenc() {
   if (currentPlanta !== 'all') items = items.filter(x => x.planta === currentPlanta);
   if (currentCategoria !== 'all') items = items.filter(x => x.cat === currentCategoria);
   const q = skuSearch.trim().toLowerCase();
-  if (q) items = items.filter(x => x.n.toLowerCase().includes(q));
+  if (q) items = items.filter(x => x.n.toLowerCase().includes(q) || String(x.sku).toLowerCase().includes(q));
   const crit = items.filter(x => x.nivel === 'critico');
   const ale = items.filter(x => x.nivel === 'alerta');
   const table = (list, color) => `
