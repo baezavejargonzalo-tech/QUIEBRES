@@ -570,19 +570,30 @@ function renderMermaCategoria() {
   if (!items.length) { el.innerHTML = '<p style="color:var(--muted);font-size:13px;padding:12px 0">Sin categorías en riesgo de merma para este filtro</p>'; return; }
   const cats = [...new Set(items.map(x => x.cat))];
   const summary = `<div style="font-size:11px;font-weight:800;color:#B8860B;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🟡 ${cats.length} categoría${cats.length === 1 ? '' : 's'} en riesgo de merma (${items.length} SKU dentro del margen de 6%)</div>`;
+  // Severidad según cuán cerca está del filtro más exigente: menos puntos
+  // de margen = más urgente (0-2 pts, 2-4 pts, 4-6 pts).
+  const severidad = m => m <= 2 ? { icon: '🔴', color: '#C8001E' } : m <= 4 ? { icon: '🟠', color: '#c84000' } : { icon: '🟡', color: '#B8860B' };
   const table = `
     <div style="overflow-x:auto">
     <table class="tbl">
-      <thead><tr><th>SKU</th><th>Producto</th><th>Categoría</th><th>Grupo de Marketing</th><th class="r">% VU actual</th><th class="r">Kg en riesgo</th></tr></thead>
+      <thead><tr><th>SKU</th><th>Producto</th><th>Categoría</th><th>Grupo de Marketing</th>
+        <th>Cadena más exigente</th><th class="r">% Aceptación exigida</th><th class="r">% VU avanzada</th>
+        <th class="r">Kg en riesgo</th><th>Advertencia</th></tr></thead>
       <tbody>
-      ${items.map(x => `<tr>
+      ${items.map(x => {
+        const sev = severidad(x.margen_pct);
+        return `<tr>
         <td style="font-size:11px;color:var(--muted);white-space:nowrap">${x.sku}</td>
-        <td style="font-weight:600;max-width:260px"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${x.n}">${x.n}</div></td>
+        <td style="font-weight:600;max-width:220px"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${x.n}">${x.n}</div></td>
         <td style="font-size:11px;color:var(--muted)">${x.cat}</td>
         <td style="font-size:11px;color:var(--muted)">${x.grupo || '<span style="color:var(--muted)">—</span>'}</td>
-        <td class="r"><span style="font-family:var(--cond);font-size:16px;font-weight:800;color:#B8860B">${x.vu_pct.toFixed(1)}%</span></td>
+        <td style="font-size:11px;color:var(--dark2);font-weight:600;white-space:nowrap">${x.cadena_exigente}</td>
+        <td class="r"><span style="font-family:var(--cond);font-size:15px;font-weight:700;color:var(--dark2)">${x.pct_aceptacion.toFixed(1)}%</span></td>
+        <td class="r"><span style="font-family:var(--cond);font-size:16px;font-weight:800;color:${sev.color}">${x.vu_avance_pct.toFixed(1)}%</span></td>
         <td class="r"><span style="font-family:var(--cond);font-size:15px;font-weight:700;color:var(--dark2)">${x.kg.toLocaleString('es-CL')}</span><div style="font-size:9px;color:var(--muted)">kg</div></td>
-      </tr>`).join('')}
+        <td style="font-size:11px;font-weight:700;color:${sev.color};max-width:220px;white-space:nowrap">${sev.icon} A ${x.margen_pct.toFixed(1)} pts de salir de ${x.cadena_exigente}</td>
+      </tr>`;
+      }).join('')}
       </tbody>
     </table>
     </div>`;
