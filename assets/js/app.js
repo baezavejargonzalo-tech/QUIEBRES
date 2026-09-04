@@ -449,13 +449,14 @@ function exportMermaCategoriaExcel() {
   if (!items.length) { alert('No hay filas para exportar con este filtro.'); return; }
 
   const headers = ['SKU', 'Producto', 'Categoría', 'Grupo de Marketing',
-    'Cadena más exigente', '% Aceptación exigida', '% VU avanzada', 'Kg en riesgo', 'Advertencia'];
+    'Cadena más exigente', '% Aceptación exigida', '% VU avanzada', 'Kg en riesgo', 'Advertencia', 'Cadenas por vencer'];
   const numCols = [5, 6, 7];
 
   const rows = items.map(x => [
     x.sku, x.n, x.cat, x.grupo || '',
     x.cadena_exigente, x.pct_aceptacion, x.vu_avance_pct, x.kg,
-    `A ${x.margen_pct.toFixed(1)}% de salir de ${x.cadena_exigente}`
+    `Falta ${x.margen_pct.toFixed(1)}% para salir de filtro`,
+    x.cadenas_por_vencer
   ]);
 
   const escCsv = v => {
@@ -620,7 +621,7 @@ function renderMermaCategoria() {
     <table class="tbl">
       <thead><tr><th>SKU</th><th>Producto</th><th>Categoría</th><th>Grupo de Marketing</th>
         <th>Cadena más exigente</th><th class="r">% Aceptación exigida</th><th class="r">% VU avanzada</th>
-        <th class="r">Kg en riesgo</th><th>Advertencia</th></tr></thead>
+        <th class="r">Kg en riesgo</th><th>Advertencia</th><th>Cadenas por vencer</th></tr></thead>
       <tbody>
       ${items.map(x => {
         const sev = severidad(x.margen_pct);
@@ -633,7 +634,8 @@ function renderMermaCategoria() {
         <td class="r"><span style="font-family:var(--cond);font-size:15px;font-weight:700;color:var(--dark2)">${x.pct_aceptacion.toFixed(1)}%</span></td>
         <td class="r"><span style="font-family:var(--cond);font-size:16px;font-weight:800;color:${sev.color}">${x.vu_avance_pct.toFixed(1)}%</span></td>
         <td class="r"><span style="font-family:var(--cond);font-size:15px;font-weight:700;color:var(--dark2)">${x.kg.toLocaleString('es-CL')}</span><div style="font-size:9px;color:var(--muted)">kg</div></td>
-        <td style="font-size:11px;font-weight:700;color:${sev.color};max-width:220px;white-space:nowrap">${sev.icon} A ${x.margen_pct.toFixed(1)}% de salir de ${x.cadena_exigente}</td>
+        <td style="font-size:11px;font-weight:700;color:${sev.color};white-space:nowrap">${sev.icon} Falta ${x.margen_pct.toFixed(1)}% para salir de filtro</td>
+        <td style="font-size:10.5px;color:${sev.color};font-weight:600;max-width:200px">${x.cadenas_por_vencer}</td>
       </tr>`;
       }).join('')}
       </tbody>
