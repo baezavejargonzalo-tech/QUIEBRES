@@ -449,7 +449,7 @@ function exportMermaCategoriaExcel() {
   if (!items.length) { alert('No hay filas para exportar con este filtro.'); return; }
 
   const headers = ['SKU', 'Producto', 'Categoría', 'Grupo de Marketing',
-    'Cadena más exigente', '% Aceptación exigida', '% VU avanzada', 'Kg en riesgo', '% Faltante para salir', 'Cadenas por vencer'];
+    'Cadena más exigente', '% Avance Máx. Aceptado', '% VU avanzada', 'Kg en riesgo', '% Faltante para salir', 'Cadenas por vencer'];
   const numCols = [5, 6, 7, 8];
 
   const rows = items.map(x => [
@@ -620,7 +620,7 @@ function renderMermaCategoria() {
     <div style="overflow-x:auto">
     <table class="tbl">
       <thead><tr><th>SKU</th><th>Producto</th><th>Categoría</th><th>Grupo de Marketing</th>
-        <th>Cadena más exigente</th><th class="r">% Aceptación exigida</th><th class="r">% VU avanzada</th>
+        <th>Cadena más exigente</th><th class="r">% Avance Máx. Aceptado</th><th class="r">% VU avanzada</th>
         <th class="r">Kg en riesgo</th><th class="r">% Faltante para salir</th><th>Cadenas por vencer</th></tr></thead>
       <tbody>
       ${items.map(x => {
