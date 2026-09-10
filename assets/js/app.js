@@ -537,6 +537,48 @@ function renderRiesgosTable() {
   body.innerHTML = html;
 }
 
+// Cruce Quiebre (LOGISTICO) vs. Venta Real Sell Out/Sell In (MERMAS_TP) por
+// SKU y semana — solo tiene sentido mostrarlo para 1 SKU a la vez, así que
+// se activa cuando el filtro combinado (búsqueda por código o nombre, más
+// los demás filtros de arriba) deja un único SKU visible en la tabla.
+// Objetivo: ver si el quiebre de una semana se nota en una caída de venta
+// real esa misma semana — MERMAS_TP no tiene planta, así que el cruce es
+// a nivel país por SKU, no por planta.
+function semNum(s) { return parseInt(s.replace('S', ''), 10) || 0; }
+function renderQuiebreVsVenta() {
+  const el = document.getElementById('quiebreVsVentaPanel');
+  if (!el) return;
+  const filtered = getFilteredRiesgos();
+  const skusUnicos = [...new Set(filtered.map(r => r.sku))];
+  if (skusUnicos.length !== 1) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  const sku = skusUnicos[0];
+  const nombre = filtered[0].n;
+  const qSem = QUIEBRE_SKU_SEM[sku] || {};
+  const vSem = (typeof MERMA_TP_SKU_SEM !== 'undefined' && MERMA_TP_SKU_SEM[sku]) || {};
+  const semanas = [...new Set([...Object.keys(qSem), ...Object.keys(vSem)])].sort((a, b) => semNum(a) - semNum(b));
+  if (!semanas.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  const rows = semanas.map(s => {
+    const q = qSem[s] || 0;
+    const v = vSem[s] || { so: 0, si: 0 };
+    return `<tr>
+      <td style="font-weight:700;color:var(--dark2)">${s}</td>
+      <td class="r">${q > 0 ? `<span style="font-family:var(--cond);font-size:16px;font-weight:800;color:#C8001E">${q.toLocaleString('es-CL', { minimumFractionDigits: 1 })}</span> <span style="font-size:9px;color:var(--muted)">ton</span>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
+      <td class="r">${v.so > 0 ? `<span style="font-family:var(--cond);font-size:16px;font-weight:800;color:#009060">${v.so.toLocaleString('es-CL', { minimumFractionDigits: 2 })}</span> <span style="font-size:9px;color:var(--muted)">ton</span>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
+      <td class="r">${v.si > 0 ? `<span style="font-family:var(--cond);font-size:16px;font-weight:700;color:#2D5BE3">${v.si.toLocaleString('es-CL', { minimumFractionDigits: 2 })}</span> <span style="font-size:9px;color:var(--muted)">ton</span>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
+    </tr>`;
+  }).join('');
+  el.style.display = '';
+  el.innerHTML = `
+    <div class="panel-title" style="margin-bottom:4px">🔀 Quiebre vs. Venta Real por semana <em>${nombre} · SKU ${sku}</em></div>
+    <div style="font-size:11.5px;color:var(--muted);margin-bottom:12px">Cruce por código de SKU entre LOGISTICO (Quiebre) y MERMAS_TP (Venta Física Sell Out/Sell In) — a nivel país, sin desglose por planta. Útil para ver si el quiebre de una semana se refleja en menos venta real esa semana.</div>
+    <div style="overflow-x:auto">
+    <table class="tbl" style="max-width:520px">
+      <thead><tr><th>Semana</th><th class="r">Quiebre</th><th class="r">Sell Out</th><th class="r">Sell In</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    </div>`;
+}
+
 // Stock por rango de VU consumida (archivo "Stock x VUC"): vista rápida
 // de cuánto stock (kg) está fresco vs. cerca de vencer, en 8 rangos fijos
 // de % de vida útil ya consumida. No tiene planta/categoría por fila útil
@@ -732,6 +774,7 @@ function renderRiesgos() {
   renderRiesgosQuebraKPIs();
   renderRiesgosSubcat();
   renderRiesgosTable();
+  renderQuiebreVsVenta();
 
   renderMermaCategoria();
   renderStockVuc();
