@@ -1,0 +1,397 @@
+<title>__TITULO__</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=Source+Sans+3:wght@400;600;700&display=swap">
+<style>
+/* Layout: hoja de planificación — encabezado compacto, KPIs, curva semanal, luego tablas de trabajo a todo el ancho */
+:root{
+  --bg:#f5f7f9; --panel:#ffffff; --ink:#14212e; --muted:#5b6875; --line:#dbe2e8; --soft:#eef2f5;
+  --accent:#1d5c8f; --accent-soft:#d9e7f2; --y25:#9aa7b3;
+  --merma:#a86400; --merma-bg:#fbefdc; --quiebre:#b3261e; --quiebre-bg:#fae3e1; --ok:#2d7a4a; --ok-bg:#e1f1e6;
+  --f-display:"Archivo","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Source Sans 3","Segoe UI",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f161d; --panel:#16202a; --ink:#e4ebf1; --muted:#97a5b2; --line:#2a3743; --soft:#1c2834;
+  --accent:#6fb0e3; --accent-soft:#1d3447; --y25:#5f6e7b;
+  --merma:#e9a94b; --merma-bg:#3a2a12; --quiebre:#f08a80; --quiebre-bg:#3d1c1a; --ok:#6cc48d; --ok-bg:#16301f; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f161d; --panel:#16202a; --ink:#e4ebf1; --muted:#97a5b2; --line:#2a3743; --soft:#1c2834;
+  --accent:#6fb0e3; --accent-soft:#1d3447; --y25:#5f6e7b;
+  --merma:#e9a94b; --merma-bg:#3a2a12; --quiebre:#f08a80; --quiebre-bg:#3d1c1a; --ok:#6cc48d; --ok-bg:#16301f; color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45}
+.wrap{max-width:1360px;margin:0 auto;padding-block:28px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:28px}
+h1,h2,h3{font-family:var(--f-display);font-stretch:85%;margin:0;text-wrap:balance}
+h1{font-size:clamp(28px,4vw,40px);font-weight:800;letter-spacing:-.01em}
+h2{font-size:20px;font-weight:700}
+.eyebrow{font-family:var(--f-display);font-stretch:80%;text-transform:uppercase;letter-spacing:.08em;font-size:12px;font-weight:700;color:var(--accent)}
+.sub{color:var(--muted);font-size:14px;max-width:80ch}
+.num{font-variant-numeric:tabular-nums}
+header{display:flex;flex-direction:column;gap:6px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.kpi .lbl{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+.kpi .big{font-family:var(--f-display);font-stretch:85%;font-size:30px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1}
+.kpi .big small{font-size:15px;font-weight:600;color:var(--muted)}
+.kpi .cmp{font-size:13.5px;color:var(--muted)}
+.pill{display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.p-merma{background:var(--merma-bg);color:var(--merma)} .p-quiebre{background:var(--quiebre-bg);color:var(--quiebre)} .p-ok{background:var(--ok-bg);color:var(--ok)} .p-neu{background:var(--soft);color:var(--muted)} .p-acc{background:var(--accent-soft);color:var(--accent)}
+section{display:flex;flex-direction:column;gap:12px;min-width:0}
+.sec-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px 16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;min-width:0}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--muted)}
+.legend i{display:inline-block;width:18px;height:3px;border-radius:2px;vertical-align:middle;margin-right:6px}
+.chart{position:relative}
+.chart svg{display:block;width:100%;height:auto}
+.chart text{fill:var(--muted);font-size:11px;font-family:var(--f-body)}
+.tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12.5px;box-shadow:0 4px 14px rgb(0 0 0 / .12);white-space:nowrap;z-index:5}
+.tip b{font-family:var(--f-display);font-stretch:85%}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th{font-family:var(--f-display);font-stretch:85%;font-weight:700;font-size:12.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;position:sticky;top:0;background:var(--panel);z-index:1;vertical-align:bottom}
+th.sort{cursor:pointer;user-select:none} th.sort:hover{color:var(--ink)} th.on{color:var(--accent)}
+th.l,td.l{text-align:left}
+td{font-variant-numeric:tabular-nums}
+td.prod{white-space:normal;min-width:220px;max-width:320px}
+td.prod .code{color:var(--muted);font-size:12px;display:block}
+tbody tr.row{cursor:pointer} tbody tr.row:hover{background:var(--soft)} tbody tr.row:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+tbody tr.open{background:var(--soft)}
+tr.tot td{font-weight:700;border-top:2px solid var(--line)}
+.grp th{background:var(--soft);text-align:center;border-bottom:none;padding-bottom:2px}
+.tight{max-height:70vh;overflow:auto}
+.ctrls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+input[type=search],select{font:inherit;font-size:14px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);min-width:0}
+input[type=search]{width:240px;max-width:100%}
+.chip{font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:99px;padding:5px 12px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--panel)}
+.chip .n{font-variant-numeric:tabular-nums;opacity:.8;margin-left:4px}
+button.btn{font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:6px 12px;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.flags{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-start}
+.promo{font-size:12px;color:var(--muted);white-space:normal;max-width:220px;text-align:left}
+.promo b{color:var(--ink);font-weight:600}
+.detail td{padding:14px;background:var(--soft);white-space:normal;text-align:left}
+.dgrid{position:sticky;left:14px;display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:16px}
+@media (max-width:900px){.dgrid{grid-template-columns:1fr}}
+.dgrid h3{font-size:15px;margin-bottom:6px}
+.note{font-size:13px;color:var(--muted)}
+.method{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px 28px;font-size:14px}
+.method h3{font-size:15px;margin-bottom:4px}
+.method p{margin:0 0 6px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:8px;font-size:13px;z-index:10}
+.neg{color:var(--quiebre)} .pos{color:var(--merma)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Mes +1 · Lácteos y Jugos</div>
+    <h1 id="titulo">Forecast</h1>
+    <div class="sub" id="subt"></div>
+  </header>
+
+  <div class="kpis" id="kpis"></div>
+
+  <section id="sec-curva">
+    <div class="sec-head">
+      <h2>Sell In semanal supermercados vs forecast</h2>
+      <div class="legend" id="leg-total"></div>
+    </div>
+    <div class="card chart" id="chart-total"></div>
+    <div class="note" id="nota-curva"></div>
+  </section>
+
+  <section id="sec-cadenas">
+    <div class="sec-head"><h2>Por cadena</h2><span class="note">Toneladas del mes. Haz clic en una cadena para filtrar los SKU.</span></div>
+    <div class="card scroll"><table id="t-cad"></table></div>
+  </section>
+
+  <section id="sec-sku">
+    <div class="sec-head">
+      <h2>Por SKU</h2>
+      <div class="ctrls">
+        <input type="search" id="q" placeholder="Buscar SKU o producto" aria-label="Buscar SKU o producto">
+        <select id="f-subcat" aria-label="Subcategoría"></select>
+        <select id="f-cad" aria-label="Cadena"></select>
+        <button class="btn" id="copiar" type="button">Copiar tabla para Excel</button>
+      </div>
+    </div>
+    <div class="ctrls" id="chips"></div>
+    <div class="card tight"><table id="t-sku"></table></div>
+    <div class="note" id="nota-sku"></div>
+  </section>
+
+  <section id="sec-metodo">
+    <h2>Cómo se calcula</h2>
+    <div class="card method" id="metodo"></div>
+  </section>
+</div>
+<div class="tip" id="tip" hidden></div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const D=/*__DATOS__*/null;
+const MES=D.mes_nombre, MESC=MES[0].toUpperCase()+MES.slice(1), A0=D.anio-1, A1=D.anio;
+const PRECIO={posCls:'p-quiebre',negCls:'p-ok'};   // como tu Leyenda: rojo = precio subió, verde = bajó
+const U={sop:0.15, ref:0.25, minT:3, sesgo:0.30, precio:0.05};   // umbrales de alerta
+const $=s=>document.querySelector(s);
+const fT=v=>v==null||isNaN(v)?'—':(Math.abs(v)>=100?Math.round(v).toLocaleString('es-CL'):v.toLocaleString('es-CL',{maximumFractionDigits:1,minimumFractionDigits:Math.abs(v)<10&&v!==0?1:0}));
+const fP=(v,s=true)=>v==null||!isFinite(v)?'—':(s&&v>0?'+':'')+(v*100).toLocaleString('es-CL',{maximumFractionDigits:0})+'%';
+const fX=v=>v==null?'—':v.toLocaleString('es-CL',{maximumFractionDigits:2,minimumFractionDigits:2})+'×';
+const fCLP=v=>v==null?'—':'$'+Math.round(v).toLocaleString('es-CL');
+const dlt=(a,b)=>b>0?a/b-1:null;
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function pillDelta(d,abs,thr,{posCls='p-merma',negCls='p-quiebre'}={}){
+  if(d==null||!isFinite(d))return '<span class="pill p-neu">—</span>';
+  const cls=Math.abs(d)>=thr&&abs>=U.minT?(d>0?posCls:negCls):'p-neu';
+  return `<span class="pill ${cls}">${fP(d)}</span>`;
+}
+
+/* ---------- encabezado ---------- */
+$('#titulo').textContent=`Forecast ${MESC} ${A1}`;
+const pesos=Object.entries(D.pesos_act).map(([w,p])=>p<1?`S${w} (${Math.round(p*7)} día${Math.round(p*7)>1?'s':''})`:`S${w}`).join(', ');
+$('#subt').innerHTML=`Archivo <b>${esc(D.archivo)}</b> · generado ${D.generado}. ${MESC} ${A1} = ${pesos}`+
+  (D.proxy_semanas.length?`; la S${D.proxy_semanas.join(', S')} no está en el forecast y se usa la S${D.ult_fcst}`:'')+
+  `. Historia de Sell In y precios ${A0}–${A1} solo para supermercados (hay ${A1} real hasta la S${D.ult_real}).`;
+
+/* ---------- KPIs ---------- */
+const S=D.skus, T=D.total;
+const tot=k=>S.reduce((a,s)=>a+(s[k]||0),0);
+const fcstTot=tot('fcst'), sopTot=tot('sop'), fcstRet=tot('fcst_ret'), refRet=tot('ref');
+const kpi=(lbl,big,unit,cmp)=>`<div class="kpi"><div class="lbl">${lbl}</div><div class="big">${big} <small>${unit}</small></div><div class="cmp">${cmp}</div></div>`;
+$('#kpis').innerHTML=
+  kpi(`FCST ${MES} · todos los canales`,fT(fcstTot),'t',`SOP ${D.mes_abrev} ${fT(sopTot)} t ${pillDelta(dlt(fcstTot,sopTot),99,0.05)}`)+
+  kpi(`FCST ${MES} · supermercados`,fT(fcstRet),'t',`Referencia histórica ${fT(refRet)} t ${pillDelta(dlt(fcstRet,refRet),99,0.1)}`)+
+  kpi(`Sell In ${MES} ${A0} · supermercados`,fT(T.si_mes_ant),'t',`Ritmo ${A1} vs ${A0} (S${D.sem_yoy[0]}–S${D.sem_yoy[1]}): <b>${fP(T.yoy-1)}</b>`)+
+  kpi(`Sesgo del FCST S${D.sem_overlap[0]}–S${D.sem_overlap[1]}`,fP(T.sesgo),'',`FCST ${fT(T.ov_fcst)} t vs Sell In real ${fT(T.ov_real)} t`)+
+  kpi(`Precio actual vs ${MES} ${A0}`,fP(T.dp_real),'real',`Nominal ${fP(T.dp_nom)} · ${fCLP(T.p_act)} vs ${fCLP(T.p_ant)} por caja`);
+
+/* ---------- gráfico semanal ---------- */
+const tip=$('#tip');
+function lineChart(el,series,{h=260,band=null,fmt=fT,yLabel='t'}={}){
+  const W=Math.max(el.clientWidth-28,280), H=h, m={l:46,r:12,t:12,b:26};
+  const xs=[...new Set(series.flatMap(s=>s.pts.map(p=>p[0])))].sort((a,b)=>a-b);
+  if(!xs.length){el.innerHTML='<div class="note">Sin datos de historia para este SKU.</div>';return;}
+  const x0=xs[0],x1=xs[xs.length-1];
+  const vals=series.flatMap(s=>s.pts.map(p=>p[1])).filter(v=>v!=null);
+  let lo=Math.min(0,...vals), hi=Math.max(...vals)*1.08||1;
+  if(series.yFree){lo=Math.min(...vals)*0.95;}
+  const X=w=>m.l+(x1===x0?0:(w-x0)/(x1-x0))*(W-m.l-m.r), Y=v=>H-m.b-(v-lo)/(hi-lo||1)*(H-m.t-m.b);
+  const ticks=[];const step=niceStep((hi-lo)/4);for(let v=Math.ceil(lo/step)*step;v<=hi;v+=step)ticks.push(v);
+  let g=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Serie semanal">`;
+  if(band){g+=`<rect x="${X(band[0])-4}" y="${m.t}" width="${X(band[1])-X(band[0])+8}" height="${H-m.t-m.b}" fill="var(--accent-soft)"/>`+
+    `<text x="${(X(band[0])+X(band[1]))/2}" y="${m.t+12}" text-anchor="middle" style="font-weight:700;fill:var(--accent)">${MES}</text>`;}
+  ticks.forEach(v=>{g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${m.l-6}" y="${Y(v)+4}" text-anchor="end">${fmt(v)}</text>`;});
+  const every=Math.ceil(xs.length/((W-m.l)/34));
+  xs.forEach((w,i)=>{if(i%every===0)g+=`<text x="${X(w)}" y="${H-8}" text-anchor="middle">S${w}</text>`;});
+  series.forEach(s=>{
+    const segs=[];let cur=[];s.pts.forEach(p=>{if(p[1]==null){if(cur.length)segs.push(cur);cur=[];}else cur.push(p);});if(cur.length)segs.push(cur);
+    segs.forEach(sg=>{g+=`<polyline fill="none" stroke="${s.color}" stroke-width="${s.w||2}" ${s.dash?`stroke-dasharray="${s.dash}"`:''} stroke-linejoin="round" points="${sg.map(p=>X(p[0]).toFixed(1)+','+Y(p[1]).toFixed(1)).join(' ')}"/>`;});
+    const last=s.pts.filter(p=>p[1]!=null).pop();if(last)g+=`<circle cx="${X(last[0])}" cy="${Y(last[1])}" r="3" fill="${s.color}"/>`;
+  });
+  g+=`<line id="hl" x1="0" x2="0" y1="${m.t}" y2="${H-m.b}" stroke="var(--muted)" stroke-dasharray="2 3" visibility="hidden"/>`;
+  g+=`<rect x="${m.l}" y="${m.t}" width="${W-m.l-m.r}" height="${H-m.t-m.b}" fill="transparent" class="hit"/></svg>`;
+  el.innerHTML=g;
+  const svg=el.querySelector('svg'),hl=svg.querySelector('#hl');
+  svg.querySelector('.hit').addEventListener('pointermove',e=>{
+    const r=svg.getBoundingClientRect(),sx=(e.clientX-r.left)*W/r.width;
+    const w=xs.reduce((a,b)=>Math.abs(X(b)-sx)<Math.abs(X(a)-sx)?b:a);
+    hl.setAttribute('x1',X(w));hl.setAttribute('x2',X(w));hl.setAttribute('visibility','visible');
+    tip.innerHTML=`<b>Semana ${w}</b><br>`+series.map(s=>{const p=s.pts.find(p=>p[0]===w);return p&&p[1]!=null?`<span style="color:${s.color}">●</span> ${s.name}: <b>${fmt(p[1])}</b> ${yLabel}`:''}).filter(Boolean).join('<br>');
+    tip.hidden=false;
+    const er=el.getBoundingClientRect(),wr=document.body.getBoundingClientRect();
+    let left=e.clientX-wr.left+14;if(left+tip.offsetWidth>document.documentElement.clientWidth-8)left=e.clientX-wr.left-tip.offsetWidth-14;
+    tip.style.left=Math.max(8,left)+'px';tip.style.top=(e.clientY-wr.top+14)+'px';
+  });
+  svg.querySelector('.hit').addEventListener('pointerleave',()=>{tip.hidden=true;hl.setAttribute('visibility','hidden');});
+}
+function niceStep(r){const p=Math.pow(10,Math.floor(Math.log10(r||1)));const n=r/p;return (n<1.5?1:n<3?2:n<7?5:10)*p;}
+const css=v=>`var(${v})`;
+function serieTotal(){
+  const ws=Object.keys(D.total_sem).map(Number);
+  const xsAll=ws.filter(w=>w>=D.sem_yoy[0]);
+  return [
+    {name:`Sell In ${A0}`,color:css('--y25'),pts:xsAll.map(w=>[w,D.total_sem[w].si0])},
+    {name:`Sell In ${A1}`,color:css('--accent'),w:2.5,pts:xsAll.filter(w=>w<=D.ult_real).map(w=>[w,D.total_sem[w].si1])},
+    {name:`FCST ${A1} (supermercados)`,color:css('--merma'),dash:'5 4',pts:Object.entries(D.total_sem_fcst).map(([w,v])=>[+w,v])},
+  ];
+}
+const nov=Object.keys(D.pesos_act).map(Number).filter(w=>D.pesos_act[w]>0.5);
+function legend(el,series){el.innerHTML=series.map(s=>`<span><i style="background:${s.color}"></i>${s.name}</span>`).join('');}
+function drawTotal(){const s=serieTotal();legend($('#leg-total'),s);lineChart($('#chart-total'),s,{band:[Math.min(...nov),Math.max(...nov)]});}
+$('#nota-curva').textContent=`Solo cadenas de supermercados con historia (Walmart, Cencosud, Unimarc, Tottus, Alvi y Supermercados Región). La banda marca ${MES}. Canal Tradicional, CCU e Industrial no tienen Sell In en el archivo de precios.`;
+
+/* ---------- flags ---------- */
+function flagsDe(r,conSop){
+  const f=[];
+  if(conSop&&r.sop>0){const d=dlt(r.fcst,r.sop);if(Math.abs(d)>=U.sop&&Math.abs(r.fcst-r.sop)>=U.minT)f.push({k:'sop',t:d>0?'Sobre SOP':'Bajo SOP',c:d>0?'p-merma':'p-quiebre'});}
+  const fr=r.fcst_ret??r.fcst;
+  if(r.ref!=null){const d=dlt(fr,r.ref);if(d!=null&&Math.abs(d)>=U.ref&&Math.abs(fr-r.ref)>=U.minT)f.push({k:'hist',t:d>0?'Sobre historia':'Bajo historia',c:d>0?'p-merma':'p-quiebre',dir:d>0?1:-1});}
+  if(r.sesgo!=null&&Math.abs(r.sesgo)>=U.sesgo&&Math.abs(r.ov_fcst-r.ov_real)>=U.minT)f.push({k:'sesgo',t:r.sesgo>0?'Venía alto':'Venía bajo',c:r.sesgo>0?'p-merma':'p-quiebre'});
+  const base=r.base||r;
+  (r.promos||[]).filter(p=>p.vigente&&p.vol).forEach(p=>{const c=(base.cadenas||[]).find(c=>c.subcadena===p.cadena);
+    if(c&&p.vol-c.fcst>=1&&!f.some(x=>x.k==='pactado'))f.push({k:'pactado',t:'Pactado > FCST',c:'p-quiebre'});});
+  if(r.dp_real!=null&&r.dp_real>=U.precio&&r.ref!=null&&fr>r.ref)f.push({k:'precio',t:'Precio arriba',c:'p-merma'});
+  if(r.dp_real!=null&&r.dp_real<=-U.precio&&r.ref!=null&&fr<r.ref)f.push({k:'precio',t:'Precio abajo',c:'p-quiebre'});
+  return f;
+}
+
+/* ---------- tabla cadenas ---------- */
+let filtroCad='';
+function drawCad(){
+  const rows=D.cadenas.map(c=>({...c,ref:c.ref_sum}));
+  const tf=rows.reduce((a,c)=>a+c.fcst,0),tr=rows.reduce((a,c)=>a+c.ref,0),ts=rows.reduce((a,c)=>a+c.si_mes_ant,0);
+  let h=`<thead><tr><th class="l">Cadena</th><th>FCST ${MES}</th><th>Referencia</th><th>Δ vs ref.</th><th>Sell In ${MES} ${A0}</th><th>Ritmo ${A1} vs ${A0}</th><th>Sesgo S${D.sem_overlap[0]}–${D.sem_overlap[1]}</th><th>Δ precio real</th><th class="l">Alertas</th></tr></thead><tbody>`;
+  rows.forEach(c=>{
+    const fl=flagsDe({...c,fcst_ret:c.fcst},false).map(f=>`<span class="pill ${f.c}">${f.t}</span>`).join(' ');
+    h+=`<tr class="row${filtroCad===c.subcadena?' open':''}" tabindex="0" data-cad="${esc(c.subcadena)}"><td class="l"><b>${esc(c.subcadena)}</b></td><td>${fT(c.fcst)}</td><td>${fT(c.ref)}</td><td>${pillDelta(dlt(c.fcst,c.ref),Math.abs(c.fcst-c.ref),U.ref)}</td><td>${fT(c.si_mes_ant)}</td><td>${fP(c.yoy-1)}</td><td>${pillDelta(c.sesgo,Math.abs(c.ov_fcst-c.ov_real),U.sesgo)}</td><td>${pillDelta(c.dp_real,99,U.precio,PRECIO)}</td><td class="l"><span class="flags">${fl}</span></td></tr>`;
+  });
+  h+=`<tr class="tot"><td class="l">Supermercados</td><td>${fT(tf)}</td><td>${fT(tr)}</td><td>${pillDelta(dlt(tf,tr),99,0.1)}</td><td>${fT(ts)}</td><td>${fP(T.yoy-1)}</td><td>${fP(T.sesgo)}</td><td>${pillDelta(T.dp_real,99,U.precio,PRECIO)}</td><td></td></tr>`;
+  D.no_retail.forEach(c=>{h+=`<tr class="row${filtroCad===c.subcadena?' open':''}" tabindex="0" data-cad="${esc(c.subcadena)}"><td class="l">${esc(c.subcadena)}</td><td>${fT(c.fcst)}</td><td colspan="7" class="l note">Sin Sell In en el archivo de precios: solo se compara contra SOP a nivel SKU.</td></tr>`;});
+  const tAll=tf+D.no_retail.reduce((a,c)=>a+c.fcst,0);
+  h+=`<tr class="tot"><td class="l">Total todos los canales</td><td>${fT(tAll)}</td><td colspan="7" class="l note">SOP ${D.mes_abrev}: ${fT(sopTot)} t (${fP(dlt(tAll,sopTot))})</td></tr></tbody>`;
+  $('#t-cad').innerHTML=h;
+}
+$('#t-cad').addEventListener('click',e=>{const tr=e.target.closest('tr[data-cad]');if(!tr)return;setCad(filtroCad===tr.dataset.cad?'':tr.dataset.cad);});
+$('#t-cad').addEventListener('keydown',e=>{if(e.key==='Enter'){const tr=e.target.closest('tr[data-cad]');if(tr)setCad(filtroCad===tr.dataset.cad?'':tr.dataset.cad);}});
+function setCad(c){filtroCad=c;$('#f-cad').value=c;drawCad();drawSku();if(c)$('#sec-sku').scrollIntoView({behavior:'smooth',block:'start'});}
+
+/* ---------- tabla SKU ---------- */
+const subcats=[...new Set(S.map(s=>s.subcat))].sort();
+$('#f-subcat').innerHTML='<option value="">Todas las subcategorías</option>'+subcats.map(s=>`<option>${esc(s)}</option>`).join('');
+const cads=[...D.cadenas.map(c=>c.subcadena),...D.no_retail.map(c=>c.subcadena)];
+$('#f-cad').innerHTML='<option value="">Todas las cadenas</option>'+cads.map(s=>`<option>${esc(s)}</option>`).join('');
+const CHIPS=[['todos','Todos'],['alerta','Con alerta'],['sop','Δ vs SOP'],['hist','Δ vs historia'],['sesgo','Venía desviado'],['precio','Precio'],['promo','Con promo'],['pactado','Pactado > FCST']];
+let chip='alerta', orden={k:'fcst',dir:-1}, abierto=null;
+
+function filas(){
+  const q=$('#q').value.trim().toLowerCase(), sc=$('#f-subcat').value;
+  return S.filter(s=>(!sc||s.subcat===sc)&&(!q||String(s.sku).includes(q)||s.producto.toLowerCase().includes(q))).map(s=>{
+    let r;
+    if(filtroCad){const c=s.cadenas.find(c=>c.subcadena===filtroCad);if(!c)return null;
+      r={...c,sku:s.sku,producto:s.producto,subcat:s.subcat,fcst_ret:c.retail?c.fcst:null,sop:null,
+        promos:s.promos.filter(p=>p.cadena===filtroCad),uplift:upliftDe(c.sem_fcst),base:s};}
+    else r={...s,base:s};
+    r.flags=flagsDe(r,!filtroCad);
+    r.dref=r.ref!=null?dlt(r.fcst_ret??r.fcst,r.ref):null; r.dsop=r.sop?dlt(r.fcst,r.sop):null;
+    r.promoV=r.promos.filter(p=>p.vigente);
+    return r;
+  }).filter(Boolean);
+}
+function upliftDe(sem){const ws=Object.keys(D.pesos_act).map(Number);const w0=Math.min(...ws);const prev=D.semanas_fcst.filter(w=>w<w0&&w>=w0-4);
+  const pp=prev.reduce((a,w)=>a+(sem[w]||0),0)/(prev.length||1);const nm=ws.reduce((a,w)=>a+D.pesos_act[w]*(sem[w]??sem[D.ult_fcst]??0),0)/(D.dias_mes/7);return pp>0?nm/pp-1:null;}
+function pasaChip(r){
+  if(chip==='todos')return true;
+  if(chip==='alerta')return r.flags.length>0;
+  if(chip==='promo')return r.promoV.length>0;
+  return r.flags.some(f=>f.k===chip);
+}
+const COLS=[
+  {k:'producto',t:'Producto',l:1},{k:'subcat',t:'Subcategoría',l:1},
+  {k:'fcst',t:`FCST ${MES}`},{k:'sop',t:`SOP ${D.mes_abrev}`,noCad:1},{k:'dsop',t:'Δ vs SOP',noCad:1},
+  {k:'fcst_ret',t:'FCST super&shy;mercados',noCad:1},{k:'ref',t:'Referencia histórica'},{k:'dref',t:'Δ vs ref.'},
+  {k:'si_mes_ant',t:`Sell In ${MES} ${A0}`},{k:'yoy',t:`Ritmo ${A1}/${A0}`},{k:'sesgo',t:`Sesgo S${D.sem_overlap[0]}–${D.sem_overlap[1]}`},
+  {k:'dp_real',t:'Δ precio real'},{k:'uplift',t:`FCST ${MES} vs sem. previas`},{k:'promo',t:'Promo vigente',l:1,ns:1},{k:'flags',t:'Alertas',l:1,ns:1},
+];
+function drawSku(){
+  const all=filas();
+  $('#chips').innerHTML=CHIPS.map(([k,t])=>{const n=all.filter(r=>{const c=chip;chip=k;const p=pasaChip(r);chip=c;return p;}).length;
+    return `<button class="chip" type="button" data-chip="${k}" aria-pressed="${chip===k}">${t}<span class="n">${n}</span></button>`;}).join('');
+  let rs=all.filter(pasaChip);
+  const k=orden.k;rs.sort((a,b)=>{const va=a[k],vb=b[k];if(typeof va==='string')return orden.dir*va.localeCompare(vb);return orden.dir*((va??-1e9)-(vb??-1e9));});
+  const cols=COLS.filter(c=>!(filtroCad&&c.noCad));
+  let h='<thead><tr>'+cols.map(c=>`<th class="${c.l?'l ':''}${c.ns?'':'sort'}${orden.k===c.k?' on':''}" ${c.ns?'':`data-k="${c.k}"`}>${c.t}${orden.k===c.k?(orden.dir>0?' ▲':' ▼'):''}</th>`).join('')+'</tr></thead><tbody>';
+  const sum={fcst:0,sop:0,fcst_ret:0,ref:0,si:0};
+  rs.forEach(r=>{
+    sum.fcst+=r.fcst||0;sum.sop+=r.sop||0;sum.fcst_ret+=r.fcst_ret||0;sum.ref+=r.ref||0;sum.si+=r.si_mes_ant||0;
+    const open=abierto===r.sku;
+    const cell={
+      producto:`<td class="l prod"><b>${esc(r.producto)}</b><span class="code">${r.sku}</span></td>`,
+      subcat:`<td class="l">${esc(r.subcat)}</td>`,
+      fcst:`<td><b>${fT(r.fcst)}</b></td>`, sop:`<td>${fT(r.sop)}</td>`,
+      dsop:`<td>${r.sop?pillDelta(r.dsop,Math.abs(r.fcst-r.sop),U.sop):'—'}</td>`,
+      fcst_ret:`<td>${fT(r.fcst_ret)}</td>`, ref:`<td>${fT(r.ref)}</td>`,
+      dref:`<td>${pillDelta(r.dref,Math.abs((r.fcst_ret??r.fcst)-(r.ref??0)),U.ref)}</td>`,
+      si_mes_ant:`<td>${fT(r.si_mes_ant)}</td>`, yoy:`<td>${r.yoy!=null?fP(r.yoy-1):'—'}</td>`,
+      sesgo:`<td>${pillDelta(r.sesgo,Math.abs((r.ov_fcst||0)-(r.ov_real||0)),U.sesgo)}</td>`,
+      dp_real:`<td>${pillDelta(r.dp_real,99,U.precio,PRECIO)}</td>`,
+      uplift:`<td>${r.uplift!=null&&Math.abs(r.uplift)>=0.1?`<span class="pill p-acc">${fP(r.uplift)}</span>`:fP(r.uplift)}</td>`,
+      promo:`<td class="promo">${r.promoV.length?[...new Set(r.promoV.map(p=>`<b>${esc(p.cadena)}</b> ${esc(p.nombre.replace(/\s*\(.*$/,''))}${p.vol?` · ${fT(p.vol)} t`:''}`))].join('<br>'):'—'}</td>`,
+      flags:`<td class="l"><span class="flags">${r.flags.map(f=>`<span class="pill ${f.c}">${f.t}</span>`).join('')}</span></td>`,
+    };
+    h+=`<tr class="row${open?' open':''}" tabindex="0" data-sku="${r.sku}">${cols.map(c=>cell[c.k]).join('')}</tr>`;
+    if(open)h+=`<tr class="detail"><td colspan="${cols.length}"><div class="dgrid" style="width:${Math.max($('#t-sku').parentElement.clientWidth-30,260)}px">${detalle(r.base)}</div></td></tr>`;
+  });
+  h+=`<tr class="tot">${cols.map(c=>{
+    if(c.k==='producto')return `<td class="l">${rs.length} SKU</td>`;
+    if(c.k==='fcst')return `<td>${fT(sum.fcst)}</td>`; if(c.k==='sop')return `<td>${fT(sum.sop)}</td>`;
+    if(c.k==='dsop')return `<td>${fP(dlt(sum.fcst,sum.sop))}</td>`; if(c.k==='fcst_ret')return `<td>${fT(sum.fcst_ret)}</td>`;
+    if(c.k==='ref')return `<td>${fT(sum.ref)}</td>`; if(c.k==='dref')return `<td>${fP(dlt(filtroCad?sum.fcst:sum.fcst_ret,sum.ref))}</td>`;
+    if(c.k==='si_mes_ant')return `<td>${fT(sum.si)}</td>`; return `<td class="${c.l?'l':''}"></td>`;}).join('')}</tr></tbody>`;
+  $('#t-sku').innerHTML=h;
+  if(abierto!=null){const r=rs.find(r=>r.sku===abierto);if(r)drawDetalle(r.base);}
+  $('#nota-sku').textContent=filtroCad?`Mostrando ${filtroCad}. SOP viene a nivel SKU total, por eso no se muestra al filtrar por cadena.`:'Haz clic en un SKU para ver el detalle por cadena, la curva semanal y los precios.';
+  window._rs=rs;window._cols=cols;
+}
+$('#chips').addEventListener('click',e=>{const b=e.target.closest('[data-chip]');if(b){chip=b.dataset.chip;drawSku();}});
+$('#t-sku').addEventListener('click',e=>{
+  const th=e.target.closest('th[data-k]');if(th){const k=th.dataset.k;orden=orden.k===k?{k,dir:-orden.dir}:{k,dir:typeof S[0][k]==='string'?1:-1};drawSku();return;}
+  const tr=e.target.closest('tr[data-sku]');if(tr){const s=+tr.dataset.sku;abierto=abierto===s?null:s;drawSku();}
+});
+$('#t-sku').addEventListener('keydown',e=>{if(e.key==='Enter'){const tr=e.target.closest('tr[data-sku]');if(tr){const s=+tr.dataset.sku;abierto=abierto===s?null:s;drawSku();}}});
+['#q','#f-subcat'].forEach(s=>$(s).addEventListener('input',drawSku));
+$('#f-cad').addEventListener('change',e=>setCad(e.target.value));
+
+function detalle(s){
+  let t=`<div><h3>${esc(s.producto)} · por cadena</h3><div class="scroll"><table><thead><tr><th class="l">Cadena</th><th>FCST</th><th>Ref.</th><th>Método A</th><th>Método B</th><th>${MES} ${A0}</th><th>Ritmo</th><th>Sesgo</th><th>Precio ${MES} ${A0}</th><th>Precio actual</th><th>Δ real</th></tr></thead><tbody>`;
+  s.cadenas.forEach(c=>{t+=`<tr><td class="l">${esc(c.subcadena)}</td><td><b>${fT(c.fcst)}</b></td>`+(c.retail?
+    `<td>${fT(c.ref)}</td><td>${fT(c.metA)}</td><td>${fT(c.metB)}</td><td>${fT(c.si_mes_ant)}</td><td>${c.yoy!=null?fP(c.yoy-1):'—'}</td><td>${fP(c.sesgo)}</td><td>${fCLP(c.p_ant)}</td><td>${fCLP(c.p_act)}</td><td>${pillDelta(c.dp_real,99,U.precio,PRECIO)}</td>`:
+    `<td colspan="9" class="l note">sin historia</td>`)+'</tr>';});
+  t+='</tbody></table></div>';
+  if(s.promos.length)t+=`<h3 style="margin-top:12px">Promociones cargadas</h3><div class="note">`+s.promos.map(p=>`<div><span class="pill ${p.vigente?'p-acc':'p-neu'}">${p.vigente?'aplica a '+MES:'no aplica'}</span> <b>${esc(p.cadena)}</b> · ${esc(p.nombre)}${p.duracion?' · '+esc(p.duracion):''}${p.vol?' · pactado '+fT(p.vol)+' t':''}</div>`).join('')+'</div>';
+  t+=`</div><div><h3>Toneladas por semana (supermercados)</h3><div class="legend" id="leg-d"></div><div class="chart" id="ch-d"></div><h3 style="margin-top:10px">Precio promedio por caja</h3><div class="legend" id="leg-p"></div><div class="chart" id="ch-p"></div></div>`;
+  return t;
+}
+function drawDetalle(s){
+  const ws=Object.keys(s.sem_hist).map(Number).filter(w=>w>=D.sem_yoy[0]);
+  const ser=[{name:`Sell In ${A0}`,color:css('--y25'),pts:ws.map(w=>[w,s.sem_hist[w].si0])},
+    {name:`Sell In ${A1}`,color:css('--accent'),w:2.5,pts:ws.filter(w=>w<=D.ult_real).map(w=>[w,s.sem_hist[w].si1])},
+    {name:'FCST',color:css('--merma'),dash:'5 4',pts:Object.entries(s.sem_fcst).map(([w,v])=>[+w,v])}];
+  legend($('#leg-d'),ser);lineChart($('#ch-d'),ser,{h:200,band:[Math.min(...nov),Math.max(...nov)]});
+  const wp=Object.keys(s.sem_hist).map(Number);
+  const sp=[{name:`Precio ${A0}`,color:css('--y25'),pts:wp.map(w=>[w,s.sem_hist[w].p0])},{name:`Precio ${A1}`,color:css('--accent'),w:2.5,pts:wp.map(w=>[w,s.sem_hist[w].p1])}];
+  sp.yFree=true;
+  legend($('#leg-p'),sp);lineChart($('#ch-p'),sp,{h:170,band:[Math.min(...nov),Math.max(...nov)],fmt:v=>'$'+Math.round(v).toLocaleString('es-CL'),yLabel:''});
+}
+
+/* ---------- copiar ---------- */
+$('#copiar').addEventListener('click',()=>{
+  const cols=window._cols.filter(c=>!['flags','promo'].includes(c.k));
+  const head=['SKU',...cols.map(c=>c.t.replace(/&shy;/g,'')),'Promo vigente','Alertas'];
+  const num=v=>v==null||!isFinite(v)?'':String(Math.round(v*1000)/1000).replace('.',',');
+  const lines=[head.join('\t'),...window._rs.map(r=>[r.sku,...cols.map(c=>typeof r[c.k]==='string'?r[c.k]:c.k==='yoy'?num(r.yoy!=null?r.yoy-1:null):num(r[c.k])),[...new Set(r.promoV.map(p=>p.cadena+' '+p.nombre))].join(' | '),r.flags.map(f=>f.t).join(', ')].join('\t'))];
+  const txt=lines.join('\n');const ok=()=>toast(`Copiadas ${window._rs.length} filas. Pégalas en Excel.`);
+  try{navigator.clipboard.writeText(txt).then(ok,()=>fallback(txt));}catch(e){fallback(txt);}
+});
+function fallback(txt){const ta=document.createElement('textarea');ta.value=txt;document.body.appendChild(ta);ta.select();let ok=false;try{ok=document.execCommand('copy');}catch(e){}ta.remove();toast(ok?'Tabla copiada. Pégala en Excel.':'No se pudo copiar automáticamente en esta vista.');}
+function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(t._h);t._h=setTimeout(()=>t.hidden=true,2600);}
+
+/* ---------- metodología ---------- */
+$('#metodo').innerHTML=`
+<div><h3>FCST ${MES}</h3><p>Suma de tus semanas del forecast, prorrateadas por días: ${pesos}${D.proxy_semanas.length?`. La S${D.proxy_semanas.join(', S')} no viene en el archivo y se toma igual a la S${D.ult_fcst}`:''}. Las promociones ya están cargadas en esas semanas.</p>
+<p>El <b>SOP ${D.mes_abrev}</b> es la columna del archivo, que viene por SKU (total de canales), así que se compara contra el FCST de todos los canales.</p></div>
+<div><h3>Referencia histórica</h3><p>Promedio de dos métodos, solo para supermercados:</p>
+<p><b>A · Mismo mes del año pasado:</b> Sell In ${MES} ${A0} × ritmo ${A1}/${A0} (Sell In S${D.sem_yoy[0]}–S${D.sem_yoy[1]} de ambos años, acotado entre ${YOYS()}).</p>
+<p><b>B · Ritmo actual con estacionalidad:</b> promedio semanal S${D.sem_rr[0]}–S${D.sem_rr[1]} ${A1} × (semana promedio de ${MES} ${A0} ÷ semana promedio S${D.sem_rr[0]}–S${D.sem_rr[1]} ${A0}) × ${D.dias_mes} días.</p></div>
+<div><h3>Precio</h3><p>Precio por caja ponderado por Sell In. Se compara el precio de las últimas 2 semanas con datos (hasta S${D.ult_real}) contra el de ${MES} ${A0}. El Δ real descuenta 4,1% de inflación, igual que en tu hoja Leyenda. Colores como en tu Leyenda: rojo = precio subió, verde = precio bajó.</p>
+<p>No se aplica elasticidad a la referencia: el precio aparece como alerta para que decidas el ajuste.</p></div>
+<div><h3>Alertas</h3><p><span class="pill p-merma">naranjo</span> = FCST alto, riesgo de merma. <span class="pill p-quiebre">rojo</span> = FCST bajo, riesgo de quiebre. Solo se marcan desvíos de al menos ${U.minT} t.</p>
+<p>Δ vs SOP ≥ ${fP(U.sop,false)} · Δ vs referencia ≥ ${fP(U.ref,false)} · sesgo S${D.sem_overlap[0]}–S${D.sem_overlap[1]} ≥ ${fP(U.sesgo,false)} (tu FCST de esas semanas vs el Sell In real) · precio real ±${fP(U.precio,false)} en la misma dirección que el desvío.</p></div>
+<div><h3>Promociones</h3><p>Columnas Nombre Promo y Duración de la hoja FCST. Una promo se toma como vigente en ${MES} salvo que su duración indique otro mes (por ejemplo, "Promo Cencosud Sept."). "FCST ${MES} vs sem. previas" compara tu semana promedio de ${MES} con las 4 semanas anteriores, para ver dónde cargaste un alza.</p><p><span class="pill p-quiebre">Pactado &gt; FCST</span> = el volumen pactado de una promo en una cadena supera en 1 t o más tu FCST del mes para esa cadena.</p></div>
+<div><h3>Para el próximo mes</h3><p>Corre <code>python3 forecast_mes1/build_forecast_mes1.py ARCHIVO.xlsx --mes 12 --anio ${A1}</code> con el archivo actualizado. Necesita la columna "SOP DIC" en la hoja FCST y las semanas del mes en el forecast.</p></div>`;
+function YOYS(){return '0,3× y 3×';}
+
+drawCad();drawSku();drawTotal();
+let rz;addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{drawTotal();if(abierto!=null){const r=window._rs.find(r=>r.sku===abierto);if(r)drawDetalle(r.base);}},150);});
+</script>
