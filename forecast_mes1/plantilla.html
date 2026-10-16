@@ -93,6 +93,20 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 
   <div class="kpis" id="kpis"></div>
 
+  <section id="sec-puente">
+    <div class="sec-head">
+      <h2>Puente SOP → FCST</h2>
+      <span class="note" id="nota-puente-top"></span>
+    </div>
+    <div class="card chart" id="chart-puente"></div>
+    <div class="sec-head">
+      <div class="ctrls" id="chips-p"></div>
+      <div class="ctrls"><input type="search" id="q-p" placeholder="Buscar SKU o producto" aria-label="Buscar en el puente"><button class="btn" id="copiar-p" type="button">Copiar puente para Excel</button></div>
+    </div>
+    <div class="card tight"><table id="t-puente"></table></div>
+    <div class="note" id="nota-puente"></div>
+  </section>
+
   <section id="sec-curva">
     <div class="sec-head">
       <h2>Sell In semanal supermercados vs forecast</h2>
@@ -392,6 +406,102 @@ $('#metodo').innerHTML=`
 <div><h3>Para el próximo mes</h3><p>Corre <code>python3 forecast_mes1/build_forecast_mes1.py ARCHIVO.xlsx --mes 12 --anio ${A1}</code> con el archivo actualizado. Necesita la columna "SOP DIC" en la hoja FCST y las semanas del mes en el forecast.</p></div>`;
 function YOYS(){return '0,3× y 3×';}
 
-drawCad();drawSku();drawTotal();
+/* ---------- puente SOP → FCST ---------- */
+const CURVA_TOTTUS={'-2':0.64,'-1':1.69,'0':4.32,'1':2.48,'2':2.73,'3':1.25,'4':0.46};   // hoja Leyenda, promo sept. 2026
+function isoSemana(d){const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const dn=t.getUTCDay()||7;t.setUTCDate(t.getUTCDate()+4-dn);const y0=new Date(Date.UTC(t.getUTCFullYear(),0,1));return Math.ceil(((t-y0)/864e5+1)/7);}
+function inicioPromo(p){const m=String(p.duracion||'').match(/(\d{1,2})-(\d{1,2})-(\d{4})/);return m?isoSemana(new Date(+m[3],m[2]-1,+m[1])):null;}
+function efectoPromo(p,c){
+  // devuelve {inc, tipo, txt}: toneladas incrementales sobre la base histórica de esa cadena
+  const ref=c&&c.ref!=null?c.ref:null;
+  if(p.vol>0){
+    if(ref==null)return {inc:0,tipo:'sinbase',txt:`${p.cadena}: ${fT(p.vol)} t pactadas, sin historia para medir el incremental`};
+    const inc=Math.max(0,p.vol-ref);
+    return {inc,tipo:'vol',txt:`${p.cadena}: ${fT(p.vol)} t pactadas vs base ${fT(ref)} t → ${inc>0?'+'+fT(inc)+' t':'sin incremental'}`};
+  }
+  if(/tottus/i.test(p.nombre)&&ref!=null){
+    const w0=inicioPromo(p);if(w0==null)return {inc:0,tipo:'base',txt:`${p.cadena}: ${p.nombre}, sin fecha de inicio`};
+    const bw=ref/(D.dias_mes/7);let inc=0;
+    Object.entries(D.pesos_act).forEach(([w,pe])=>{const k=String(+w-w0);inc+=pe*bw*((CURVA_TOTTUS[k]??1)-1);});
+    return {inc,tipo:'curva',txt:`${p.cadena}: curva Tottus desde S${w0} → ${Math.abs(inc)<0.05?'sin efecto en '+MES+' (fuera de la ventana de la curva)':(inc>0?'+':'')+fT(inc)+' t'}`};
+  }
+  return {inc:0,tipo:'base',txt:`${p.cadena}: ${p.nombre.replace(/\s*\(.*$/,'')} (vigente desde antes, ya está en la base)`};
+}
+const PUENTE=S.map(s=>{
+  let ref=0,nobase=0,promo=0;const txt=[],porCad=[];
+  s.cadenas.forEach(c=>{
+    const pr=s.promos.filter(p=>p.vigente&&p.cadena===c.subcadena).map(p=>efectoPromo(p,c));
+    const inc=pr.reduce((a,e)=>a+e.inc,0);promo+=inc;pr.forEach(e=>txt.push(e.txt));
+    if(c.ref!=null){ref+=c.ref;porCad.push({cad:c.subcadena,res:c.fcst-c.ref-inc});}else nobase+=c.fcst;
+  });
+  const base=ref+nobase, tend=base-s.sop, sinexp=s.fcst-base-promo, gap=s.fcst-s.sop;
+  const tol=Math.max(U.minT,0.05*s.sop);
+  const top=porCad.sort((a,b)=>Math.abs(b.res)-Math.abs(a.res))[0];
+  const estado=Math.abs(sinexp)<=tol?'ok':(sinexp>0?'sobre':'bajo');
+  return {sku:s.sku,producto:s.producto,subcat:s.subcat,sop:s.sop,fcst:s.fcst,gap,dgap:dlt(s.fcst,s.sop),ref,nobase,tend,promo,precio:0,sinexp,estado,tol,top,txt:[...new Set(txt)],dp_real:s.dp_real};
+});
+let chipP='sin', qP='';
+function explicacion(r){
+  const p=[];
+  p.push(`Historia supermercados ${fT(r.ref)} t + otros canales ${fT(r.nobase)} t (tu FCST) = base ${fT(r.ref+r.nobase)} t, ${r.tend>=0?'+':''}${fT(r.tend)} t vs SOP.`);
+  if(r.promo>0.05)p.push(`Promos con volumen: +${fT(r.promo)} t.`);
+  if(r.estado!=='ok'&&r.top)p.push(`Sin explicar ${r.sinexp>0?'+':''}${fT(r.sinexp)} t, sobre todo en ${r.top.cad} (${r.top.res>0?'+':''}${fT(r.top.res)} t sobre su historia${r.promo>0?' y promo':''}).`);
+  if(r.dp_real!=null&&Math.abs(r.dp_real)>=U.precio)p.push(`Precio real ${fP(r.dp_real)} vs ${MES} ${A0}: efecto pendiente del archivo ${A0}.`);
+  return p.join(' ');
+}
+function drawPuente(){
+  const tot=k=>PUENTE.reduce((a,r)=>a+r[k],0);
+  const sop=tot('sop'),tend=tot('tend'),promo=tot('promo'),sin=tot('sinexp'),fc=tot('fcst');
+  const nOk=PUENTE.filter(r=>r.estado==='ok').length;
+  $('#nota-puente-top').textContent=`${nOk} de ${PUENTE.length} SKU explicados · desvío total ${fT(fc-sop)} t, sin explicar ${sin>0?'+':''}${fT(sin)} t (neto) y ${fT(PUENTE.filter(r=>r.estado!=='ok').reduce((a,r)=>a+Math.abs(r.sinexp),0))} t en valor absoluto`;
+  // cascada
+  const el=$('#chart-puente'),W=Math.max(el.clientWidth-28,300),H=230,m={l:46,r:10,t:18,b:42};
+  const pasos=[{n:`SOP ${D.mes_abrev}`,v:sop,abs:1},{n:'Tendencia histórica',v:tend},{n:'Promos con volumen',v:promo},{n:`Precio (falta ${A0})`,v:0,pend:1},{n:'Sin explicar',v:sin},{n:`FCST ${MES}`,v:fc,abs:1}];
+  let acc=0;pasos.forEach(p=>{if(p.abs){p.y0=0;p.y1=p.v;acc=p.v;}else{p.y0=acc;p.y1=acc+p.v;acc=p.y1;}});
+  const vals=pasos.flatMap(p=>p.abs?[p.y1]:[p.y0,p.y1]);const rng=Math.max(...vals)-Math.min(...vals);const lo=Math.min(...vals)-rng*0.6,hi=Math.max(...vals)+rng*0.25;
+  const Y=v=>H-m.b-(v-lo)/(hi-lo)*(H-m.t-m.b),bw=(W-m.l-m.r)/pasos.length;
+  let g=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Puente de SOP a FCST">`;
+  const step=niceStep((hi-lo)/4);for(let v=Math.ceil(lo/step)*step;v<=hi;v+=step)g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${m.l-6}" y="${Y(v)+4}" text-anchor="end">${fT(v)}</text>`;
+  pasos.forEach((p,i)=>{
+    const x=m.l+i*bw+bw*0.18,w=bw*0.64,yt=Y(Math.max(p.y0,p.y1)),yb=p.abs?Y(lo):Y(Math.min(p.y0,p.y1));
+    const col=p.abs?'var(--accent)':p.pend?'var(--line)':p.n==='Sin explicar'?(p.v>0?'var(--merma)':'var(--quiebre)'):(p.v>=0?'var(--ok)':'var(--quiebre)');
+    g+=`<rect x="${x}" y="${yt}" width="${w}" height="${Math.max(yb-yt,1.5)}" rx="2" fill="${col}"/>`;
+    g+=`<text x="${x+w/2}" y="${yt-5}" text-anchor="middle" style="font-weight:700;fill:var(--ink)">${p.pend?'pendiente':(p.abs?'':(p.v>=0?'+':''))+fT(p.v)}</text>`;
+    const lab=p.n.split(' ');const half=Math.ceil(lab.length/2);
+    g+=`<text x="${x+w/2}" y="${H-m.b+15}" text-anchor="middle">${esc(lab.slice(0,half).join(' '))}</text><text x="${x+w/2}" y="${H-m.b+28}" text-anchor="middle">${esc(lab.slice(half).join(' '))}</text>`;
+    if(i<pasos.length-1)g+=`<line x1="${x+w}" x2="${x+bw}" y1="${Y(p.y1)}" y2="${Y(p.y1)}" stroke="var(--muted)" stroke-dasharray="2 2"/>`;
+  });
+  el.innerHTML=g+'</svg>';
+  // chips + tabla
+  const filt=PUENTE.filter(r=>!qP||String(r.sku).includes(qP)||r.producto.toLowerCase().includes(qP));
+  const CH=[['sin','Sin explicar'],['sobre','FCST sobre lo explicado'],['bajo','FCST bajo lo explicado'],['ok','Explicados'],['todos','Todos']];
+  const pasa=(r,k)=>k==='todos'||(k==='sin'?r.estado!=='ok':r.estado===k);
+  $('#chips-p').innerHTML=CH.map(([k,t])=>`<button class="chip" type="button" data-chip="${k}" aria-pressed="${chipP===k}">${t}<span class="n">${filt.filter(r=>pasa(r,k)).length}</span></button>`).join('');
+  const rs=filt.filter(r=>pasa(r,chipP)).sort((a,b)=>Math.abs(b.sinexp)-Math.abs(a.sinexp));
+  const est={ok:'<span class="pill p-ok">Explicado</span>',sobre:'<span class="pill p-merma">Sobre lo explicado</span>',bajo:'<span class="pill p-quiebre">Bajo lo explicado</span>'};
+  const sg=v=>(v>0.05?'+':'')+fT(v);
+  let h=`<thead><tr><th class="l">Producto</th><th>SOP ${D.mes_abrev}</th><th>FCST ${MES}</th><th>Desvío</th><th>Tendencia histórica</th><th>Promos con volumen</th><th>Precio</th><th>Sin explicar</th><th class="l">Estado</th><th class="l">Explicación</th></tr></thead><tbody>`;
+  const sm={sop:0,fcst:0,gap:0,tend:0,promo:0,sinexp:0};
+  rs.forEach(r=>{Object.keys(sm).forEach(k=>sm[k]+=r[k]);
+    h+=`<tr class="row" tabindex="0" data-sku="${r.sku}"><td class="l prod"><b>${esc(r.producto)}</b><span class="code">${r.sku} · ${esc(r.subcat)}</span></td><td>${fT(r.sop)}</td><td><b>${fT(r.fcst)}</b></td><td>${sg(r.gap)} <span class="note">${fP(r.dgap)}</span></td><td>${sg(r.tend)}</td><td>${r.promo>0.05?sg(r.promo):'—'}</td><td class="note">pend.</td><td><b>${sg(r.sinexp)}</b></td><td class="l">${est[r.estado]}</td><td class="promo" style="max-width:420px;min-width:300px">${esc(explicacion(r))}${r.txt.length?`<br><span style="opacity:.85">${r.txt.map(esc).join(' · ')}</span>`:''}</td></tr>`;});
+  h+=`<tr class="tot"><td class="l">${rs.length} SKU</td><td>${fT(sm.sop)}</td><td>${fT(sm.fcst)}</td><td>${sg(sm.gap)}</td><td>${sg(sm.tend)}</td><td>${sg(sm.promo)}</td><td></td><td>${sg(sm.sinexp)}</td><td></td><td></td></tr></tbody>`;
+  $('#t-puente').innerHTML=h;window._rp=rs;
+  $('#nota-puente').textContent=`Desvío = Tendencia histórica + Promos con volumen + Precio + Sin explicar. Un SKU queda "Explicado" cuando lo sin explicar es menor a ${U.minT} t o al 5% de su SOP. Haz clic en un SKU para ver su detalle por cadena más abajo.`;
+}
+$('#chips-p').addEventListener('click',e=>{const b=e.target.closest('[data-chip]');if(b){chipP=b.dataset.chip;drawPuente();}});
+$('#q-p').addEventListener('input',e=>{qP=e.target.value.trim().toLowerCase();drawPuente();});
+function irSku(sku){$('#q').value=String(sku);chip='todos';abierto=sku;if(filtroCad)setCad('');drawSku();$('#sec-sku').scrollIntoView({behavior:'smooth',block:'start'});}
+$('#t-puente').addEventListener('click',e=>{const tr=e.target.closest('tr[data-sku]');if(tr)irSku(+tr.dataset.sku);});
+$('#t-puente').addEventListener('keydown',e=>{if(e.key==='Enter'){const tr=e.target.closest('tr[data-sku]');if(tr)irSku(+tr.dataset.sku);}});
+$('#copiar-p').addEventListener('click',()=>{
+  const num=v=>v==null||!isFinite(v)?'':String(Math.round(v*1000)/1000).replace('.',',');
+  const est={ok:'Explicado',sobre:'Sobre lo explicado',bajo:'Bajo lo explicado'};
+  const lines=[['SKU','Producto','Subcategoría',`SOP ${D.mes_abrev}`,`FCST ${MES}`,'Desvío','Tendencia histórica','Promos con volumen','Precio','Sin explicar','Estado','Explicación'].join('\t'),
+    ...window._rp.map(r=>[r.sku,r.producto,r.subcat,num(r.sop),num(r.fcst),num(r.gap),num(r.tend),num(r.promo),'',num(r.sinexp),est[r.estado],(explicacion(r)+' '+r.txt.join(' · ')).replace(/\t|\n/g,' ')].join('\t'))];
+  const txt=lines.join('\n');const ok=()=>toast(`Copiadas ${window._rp.length} filas del puente.`);
+  try{navigator.clipboard.writeText(txt).then(ok,()=>fallback(txt));}catch(e){fallback(txt);}
+});
+$('#metodo').insertAdjacentHTML('afterbegin',`<div><h3>Puente SOP → FCST</h3><p>Por SKU, el desvío FCST − SOP se reparte en: <b>Tendencia histórica</b> = base − SOP, donde la base es la referencia histórica de cada cadena de supermercados más tu FCST de los canales sin historia (Tradicional, CCU, Industrial); <b>Promos con volumen</b> = lo pactado sobre la base de esa cadena (Cencosud), o la curva de Tottus de tu Leyenda según la semana de inicio; las promos vigentes desde antes (Lista 4, EDLP, Ciclo 5, Solo Base) ya están en la base y suman 0; <b>Precio</b> queda pendiente hasta tener ${A0}; <b>Sin explicar</b> = lo que resta.</p></div>`);
+
+drawPuente();drawCad();drawSku();drawTotal();
 let rz;addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{drawTotal();if(abierto!=null){const r=window._rs.find(r=>r.sku===abierto);if(r)drawDetalle(r.base);}},150);});
 </script>
