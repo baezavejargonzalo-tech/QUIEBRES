@@ -248,7 +248,7 @@ function serieTotal(){
 const nov=Object.keys(D.pesos_act).map(Number).filter(w=>D.pesos_act[w]>0.5);
 function legend(el,series){el.innerHTML=series.map(s=>`<span><i style="background:${s.color}"></i>${s.name}</span>`).join('');}
 function drawTotal(){const s=serieTotal();legend($('#leg-total'),s);lineChart($('#chart-total'),s,{band:[Math.min(...nov),Math.max(...nov)]});}
-$('#nota-curva').textContent=`Solo cadenas de supermercados con historia (Walmart, Cencosud, Unimarc, Tottus, Alvi y Supermercados Región). La banda marca ${MES}. Canal Tradicional, CCU e Industrial no tienen Sell In en el archivo de precios.`;
+$('#nota-curva').textContent=`Solo cadenas de supermercados con historia (Walmart, Cencosud, Unimarc, Tottus, Alvi y Supermercados Región). La banda marca ${MES}. Canal Tradicional, CCU e Industrial no están en el archivo de precios (Canal Tradicional se compara contra su venta real en la tabla por cadena).`;
 
 /* ---------- flags ---------- */
 function flagsDe(r,conSop){
