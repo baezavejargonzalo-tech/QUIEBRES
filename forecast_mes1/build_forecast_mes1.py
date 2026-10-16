@@ -51,6 +51,7 @@ def pesos_mes(anio, mes):
 
 # Canales sin historia en la hoja de precios que se toman del archivo de venta real (TP):
 # FCST "CANAL TRADICIONAL" = gerencia TRADICIONAL Y REGIONES (incluye Operadores y Mayoristas), sin Alvi.
+CLAVE_NO_PROMO = re.compile(r"^[A-Z]+\d{8}$")   # p. ej. "JUNAEB30002065": clave de búsqueda, no una promo
 ELAST_TAU = 1.0                  # cuánto se confía en la elasticidad propia de la subcategoría vs la general
 ELAST_MIN, ELAST_MAX = -3.5, 0.0
 DP_MAX = 0.30                    # tope al Δ precio real usado para el efecto precio
@@ -267,12 +268,14 @@ def construir(xlsx, anio, mes, promo=None, venta_real=None, precio_yoy=None):
     for f in fcst:
         s = skus.setdefault(f["sku"], {
             "sku": f["sku"], "producto": f["producto"], "subcat": f["subcat"],
-            "sop": f["sop"], "fcst": 0.0, "fcst_ret": 0.0,
+            "sop": 0.0, "fcst": 0.0, "fcst_ret": 0.0,
             "fcst_sem": defaultdict(float), "fcst_sem_ret": defaultdict(float),
-            "cadenas": {}, "promos": [],
+            "cadenas": {}, "promos": [], "sop_ger": {}, "sop_vals": {}, "fcst_ger": defaultdict(float),
         })
         fm = fcst_mes(f["semanas"])
         s["fcst"] += fm
+        s["fcst_ger"][f["gerencia"]] += fm
+        s["sop_vals"].setdefault(f["gerencia"], []).append((round(f["sop"], 3), f["subcadena"]))
         for w, v in f["semanas"].items():
             s["fcst_sem"][w] += v
         key = (f["sku"], f["subcadena"])
@@ -285,13 +288,34 @@ def construir(xlsx, anio, mes, promo=None, venta_real=None, precio_yoy=None):
             s["fcst_ret"] += fm
             for w, v in f["semanas"].items():
                 s["fcst_sem_ret"][w] += v
-        if f["promo"]:
+        if f["promo"] and not CLAVE_NO_PROMO.match(str(f["promo"])):
             s["promos"].append({
                 "cadena": f["subcadena"], "nombre": str(f["promo"]),
                 "duracion": f["promo_dur"].strftime("%d-%m-%Y") if isinstance(f["promo_dur"], dt.datetime) else (str(f["promo_dur"]) if f["promo_dur"] else ""),
                 "vol": f["vol_pactado"] or None,
                 "vigente": promo_vigente(f["promo"], f["promo_dur"], anio, mes),
             })
+
+    # SOP por SKU = suma del SOP de cada gerencia (NACIONAL, ECUSA, JUNAEB…). Una gerencia que
+    # repite exactamente el SOP de NACIONAL es un arrastre de la búsqueda y no se suma.
+    sop_dup, sop_raro = [], []
+    for s in skus.values():
+        # dentro de una gerencia el SOP debe repetirse en todas las filas: se usa el valor más frecuente
+        for ger, vals in s["sop_vals"].items():
+            moda = max(set(v for v, _ in vals), key=lambda v: sum(1 for x, _ in vals if x == v))
+            s["sop_ger"][ger] = moda
+            for v, cad in vals:
+                if v != moda:
+                    sop_raro.append({"sku": s["sku"], "producto": s["producto"], "gerencia": ger, "cadena": cad, "valor": v, "usado": moda})
+        nac = s["sop_ger"].get("NACIONAL")
+        tot = 0.0
+        for ger, v in s["sop_ger"].items():
+            if ger != "NACIONAL" and nac is not None and abs(v - nac) < 0.01 and v > 0:
+                sop_dup.append({"sku": s["sku"], "gerencia": ger, "sop": v, "fcst": s["fcst_ger"][ger]})
+                s["sop_ger"][ger] = None
+                continue
+            tot += v
+        s["sop"] = tot
 
     def metricas(h_por_sem, prior=None):
         """h_por_sem: semana -> dict sumado (si0, si1, so0, so1, p0w, p1w, q0, q1).
@@ -392,6 +416,7 @@ def construir(xlsx, anio, mes, promo=None, venta_real=None, precio_yoy=None):
         salida.append({
             "sku": s["sku"], "producto": s["producto"], "subcat": s["subcat"],
             "fcst": s["fcst"], "sop": s["sop"], "fcst_ret": s["fcst_ret"],
+            "ger": [{"gerencia": g_, "sop": s["sop_ger"][g_], "fcst": s["fcst_ger"][g_]} for g_ in s["sop_ger"]],
             "uplift": prom_mes / prom_prev - 1 if prom_prev > 0 else None,
             "promos": s["promos"], "cadenas": sorted(cads, key=lambda x: -x["fcst"]),
             "sem_fcst": {w: round(v, 3) for w, v in s["fcst_sem_ret"].items()},
@@ -427,6 +452,7 @@ def construir(xlsx, anio, mes, promo=None, venta_real=None, precio_yoy=None):
         "dias_mes": dias_mes, "sem_mes": sem_act, "sem_mes_ant": sem_ant,
         "venta_real_sem": [min(w for _, w in vr_sem), max(w for _, w in vr_sem)] if vr_sem else None,
         "venta_real_cad": sorted(vr),
+        "sop_dup": sop_dup, "sop_raro": sop_raro,
         "elast": elast, "elast_pool": elast_pool, "elast_yoy": precio_yoy, "dp_max": DP_MAX,
         "archivo": Path(xlsx).name.split("-", 1)[-1] if re.match(r"^[0-9a-f]{8}-", Path(xlsx).name) else Path(xlsx).name,
         "generado": dt.date.today().strftime("%d-%m-%Y"),
@@ -464,6 +490,7 @@ def main():
     ap.add_argument("--anio", type=int, default=sig.year)
     ap.add_argument("--out", default=None)
     ap.add_argument("--venta-real", default=None, help="archivo TP de venta real (Sell In por semana) para Canal Tradicional")
+    ap.add_argument("--anterior", default=None, help="versión anterior del FCST para comparar cambios por SKU")
     ap.add_argument("--precio-yoy", default=None, help="archivo TP mensual con el mismo mes de dos años (control de elasticidad)")
     ap.add_argument("--promo-cenco", default=None, help="archivo de promos Cencosud diferenciado Jumbo / Santa Isabel")
     ap.add_argument("--promo-nombre", default=None)
@@ -478,7 +505,11 @@ def main():
                  "duracion": a.promo_duracion or f"{MESES_LARGO[a.mes - 1].capitalize()} {a.anio}"}
     venta_real = leer_venta_real(a.venta_real) if a.venta_real else None
     precio_yoy = elasticidad_yoy(a.precio_yoy) if a.precio_yoy else None
-    datos = redondear(construir(a.xlsx, a.anio, a.mes, promo, venta_real, precio_yoy))
+    datos = construir(a.xlsx, a.anio, a.mes, promo, venta_real, precio_yoy)
+    if a.anterior:
+        prev = construir(a.anterior, a.anio, a.mes)
+        datos["anterior"] = {"archivo": prev["archivo"], "skus": {s["sku"]: {"fcst": s["fcst"], "sop": s["sop"]} for s in prev["skus"]}}
+    datos = redondear(datos)
     plantilla = (AQUI / "plantilla.html").read_text(encoding="utf-8")
     html = plantilla.replace("/*__DATOS__*/null", json.dumps(datos, ensure_ascii=False, separators=(",", ":")))
     html = html.replace("__TITULO__", f"Forecast {MESES_LARGO[a.mes - 1].capitalize()} {a.anio}")
