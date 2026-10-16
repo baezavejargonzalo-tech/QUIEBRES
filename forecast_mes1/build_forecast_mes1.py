@@ -176,6 +176,10 @@ def leer_fcst(wb, mes):
             "vol_pactado": num(g("Volumen Pactado (Ton)")),
             "alcance": g("Alcance (sem)"),
         })
+        # cada gerencia tiene su propio SOP: las filas de JUNAEB, INDUSTRIAL o ECUSA se separan de
+        # las de NACIONAL aunque compartan subcadena (p. ej. "INDUSTRIAL Y FOOD SERVICE")
+        if out[-1]["gerencia"] and out[-1]["gerencia"] != "NACIONAL":
+            out[-1]["subcadena"] = f'{out[-1]["subcadena"]} · {out[-1]["gerencia"]}'
     return out, sorted(semanas)
 
 
@@ -279,7 +283,7 @@ def construir(xlsx, anio, mes, promo=None, venta_real=None, precio_yoy=None):
         for w, v in f["semanas"].items():
             s["fcst_sem"][w] += v
         key = (f["sku"], f["subcadena"])
-        c = s["cadenas"].setdefault(f["subcadena"], {"subcadena": f["subcadena"], "fcst": 0.0,
+        c = s["cadenas"].setdefault(f["subcadena"], {"subcadena": f["subcadena"], "gerencia": f["gerencia"], "fcst": 0.0,
                                                      "sem": defaultdict(float), "retail": key in hist})
         c["fcst"] += fm
         for w, v in f["semanas"].items():
@@ -296,9 +300,14 @@ def construir(xlsx, anio, mes, promo=None, venta_real=None, precio_yoy=None):
                 "vigente": promo_vigente(f["promo"], f["promo_dur"], anio, mes),
             })
 
-    # SOP por SKU = suma del SOP de cada gerencia (NACIONAL, ECUSA, JUNAEB…). Una gerencia que
-    # repite exactamente el SOP de NACIONAL es un arrastre de la búsqueda y no se suma.
-    sop_dup, sop_raro = [], []
+    # SOP por SKU = suma del SOP de cada gerencia (NACIONAL, ECUSA, JUNAEB, INDUSTRIAL).
+    # Archivos antiguos repetían el SOP total del SKU en todas las gerencias: si la mayoría de las
+    # gerencias no nacionales repiten exactamente el de NACIONAL, se toma como formato antiguo y no se suman.
+    pares = [(s["sop_vals"]["NACIONAL"], vals) for s in skus.values() if "NACIONAL" in s["sop_vals"]
+             for ger, vals in s["sop_vals"].items() if ger != "NACIONAL"]
+    iguales = sum(1 for nac, vals in pares if vals[0][0] == nac[0][0])
+    formato_antiguo = bool(pares) and iguales / len(pares) > 0.5
+    sop_dup, sop_raro, sop_igual = [], [], []
     for s in skus.values():
         # dentro de una gerencia el SOP debe repetirse en todas las filas: se usa el valor más frecuente
         for ger, vals in s["sop_vals"].items():
@@ -311,9 +320,11 @@ def construir(xlsx, anio, mes, promo=None, venta_real=None, precio_yoy=None):
         tot = 0.0
         for ger, v in s["sop_ger"].items():
             if ger != "NACIONAL" and nac is not None and abs(v - nac) < 0.01 and v > 0:
-                sop_dup.append({"sku": s["sku"], "gerencia": ger, "sop": v, "fcst": s["fcst_ger"][ger]})
-                s["sop_ger"][ger] = None
-                continue
+                if formato_antiguo:
+                    sop_dup.append({"sku": s["sku"], "gerencia": ger, "sop": v, "fcst": s["fcst_ger"][ger]})
+                    s["sop_ger"][ger] = None
+                    continue
+                sop_igual.append({"sku": s["sku"], "producto": s["producto"], "gerencia": ger, "sop": v, "fcst": s["fcst_ger"][ger]})
             tot += v
         s["sop"] = tot
 
@@ -387,7 +398,7 @@ def construir(xlsx, anio, mes, promo=None, venta_real=None, precio_yoy=None):
         cads = []
         for c in s["cadenas"].values():
             hc = hist.get((s["sku"], c["subcadena"]))
-            row = {"subcadena": c["subcadena"], "fcst": c["fcst"], "retail": c["retail"],
+            row = {"subcadena": c["subcadena"], "gerencia": c["gerencia"], "fcst": c["fcst"], "retail": c["retail"],
                    "sem_fcst": {w: round(v, 3) for w, v in c["sem"].items()}}
             if hc:
                 h1 = {}
@@ -452,7 +463,7 @@ def construir(xlsx, anio, mes, promo=None, venta_real=None, precio_yoy=None):
         "dias_mes": dias_mes, "sem_mes": sem_act, "sem_mes_ant": sem_ant,
         "venta_real_sem": [min(w for _, w in vr_sem), max(w for _, w in vr_sem)] if vr_sem else None,
         "venta_real_cad": sorted(vr),
-        "sop_dup": sop_dup, "sop_raro": sop_raro,
+        "sop_dup": sop_dup, "sop_raro": sop_raro, "sop_igual": sop_igual, "sop_formato_antiguo": formato_antiguo,
         "elast": elast, "elast_pool": elast_pool, "elast_yoy": precio_yoy, "dp_max": DP_MAX,
         "archivo": Path(xlsx).name.split("-", 1)[-1] if re.match(r"^[0-9a-f]{8}-", Path(xlsx).name) else Path(xlsx).name,
         "generado": dt.date.today().strftime("%d-%m-%Y"),
@@ -508,7 +519,9 @@ def main():
     datos = construir(a.xlsx, a.anio, a.mes, promo, venta_real, precio_yoy)
     if a.anterior:
         prev = construir(a.anterior, a.anio, a.mes)
-        datos["anterior"] = {"archivo": prev["archivo"], "skus": {s["sku"]: {"fcst": s["fcst"], "sop": s["sop"]} for s in prev["skus"]}}
+        datos["anterior"] = {"archivo": prev["archivo"], "skus": {s["sku"]: {"fcst": s["fcst"], "sop": s["sop"],
+                                                                         "ger": {g["gerencia"]: {"fcst": g["fcst"], "sop": g["sop"]} for g in s["ger"]}}
+                                                                for s in prev["skus"]}}
     datos = redondear(datos)
     plantilla = (AQUI / "plantilla.html").read_text(encoding="utf-8")
     html = plantilla.replace("/*__DATOS__*/null", json.dumps(datos, ensure_ascii=False, separators=(",", ":")))
