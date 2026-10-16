@@ -30,6 +30,12 @@ python3 forecast_mes1/build_forecast_mes1.py FCST_Lactes_y_Jugos.xlsx --mes 12 -
 Lee las hojas `FCST` (semanas S## y columna `SOP <MES>`) y `Precio vs SellIn 25-26`.
 Deja la página en `forecast_mes1/output/forecast_<anio>_<mes>.html` (no se versiona).
 
+El mes se arma con semanas de lunes a sábado: cada día hábil vale 1/6 de semana
+(noviembre 2026 = S45 + S46 + S47 + S48 + S49 × 1/6).
+
+Para usar la venta real de Canal Tradicional (gerencia Tradicional y Regiones, con Operadores
+y Mayoristas, sin Alvi) como base, agrega `--venta-real tp.xlsx` (reporte de venta por semana).
+
 Para incluir promos de Cencosud diferenciadas Jumbo / Santa Isabel:
 
 ```

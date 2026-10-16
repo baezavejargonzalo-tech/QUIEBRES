@@ -177,7 +177,7 @@ function pillDelta(d,abs,thr,{posCls='p-merma',negCls='p-quiebre'}={}){
 
 /* ---------- encabezado ---------- */
 $('#titulo').textContent=`Forecast ${MESC} ${A1}`;
-const pesos=Object.entries(D.pesos_act).map(([w,p])=>p<1?`S${w} (${Math.round(p*7)} día${Math.round(p*7)>1?'s':''})`:`S${w}`).join(', ');
+const pesos=Object.entries(D.pesos_act).map(([w,p])=>p<0.999?`S${w} × ${Math.round(p*6)}/6`:`S${w}`).join(' + ');
 $('#subt').innerHTML=`Archivo <b>${esc(D.archivo)}</b> · generado ${D.generado}. ${MESC} ${A1} = ${pesos}`+
   (D.proxy_semanas.length?`; la S${D.proxy_semanas.join(', S')} no está en el forecast y se usa la S${D.ult_fcst}`:'')+
   `. Historia de Sell In y precios ${A0}–${A1} solo para supermercados (hay ${A1} real hasta la S${D.ult_real}).`;
@@ -275,7 +275,11 @@ function drawCad(){
     h+=`<tr class="row${filtroCad===c.subcadena?' open':''}" tabindex="0" data-cad="${esc(c.subcadena)}"><td class="l"><b>${esc(c.subcadena)}</b></td><td>${fT(c.fcst)}</td><td>${fT(c.ref)}</td><td>${pillDelta(dlt(c.fcst,c.ref),Math.abs(c.fcst-c.ref),U.ref)}</td><td>${fT(c.si_mes_ant)}</td><td>${fP(c.yoy-1)}</td><td>${pillDelta(c.sesgo,Math.abs(c.ov_fcst-c.ov_real),U.sesgo)}</td><td>${pillDelta(c.dp_real,99,U.precio,PRECIO)}</td><td class="l"><span class="flags">${fl}</span></td></tr>`;
   });
   h+=`<tr class="tot"><td class="l">Supermercados</td><td>${fT(tf)}</td><td>${fT(tr)}</td><td>${pillDelta(dlt(tf,tr),99,0.1)}</td><td>${fT(ts)}</td><td>${fP(T.yoy-1)}</td><td>${fP(T.sesgo)}</td><td>${pillDelta(T.dp_real,99,U.precio,PRECIO)}</td><td></td></tr>`;
-  D.no_retail.forEach(c=>{h+=`<tr class="row${filtroCad===c.subcadena?' open':''}" tabindex="0" data-cad="${esc(c.subcadena)}"><td class="l">${esc(c.subcadena)}</td><td>${fT(c.fcst)}</td><td colspan="7" class="l note">Sin Sell In en el archivo de precios: solo se compara contra SOP a nivel SKU.</td></tr>`;});
+  D.no_retail.forEach(c=>{
+    const cs=S.flatMap(x=>x.cadenas.filter(y=>y.subcadena===c.subcadena&&y.fuente==='real'));
+    if(cs.length){const r=cs.reduce((a,y)=>a+y.ref,0),of=cs.reduce((a,y)=>a+(y.ov_fcst||0),0),orr=cs.reduce((a,y)=>a+(y.ov_real||0),0);
+      h+=`<tr class="row${filtroCad===c.subcadena?' open':''}" tabindex="0" data-cad="${esc(c.subcadena)}"><td class="l"><b>${esc(c.subcadena)}</b></td><td>${fT(c.fcst)}</td><td>${fT(r)}</td><td>${pillDelta(dlt(c.fcst,r),Math.abs(c.fcst-r),U.ref)}</td><td colspan="2" class="l note">base = venta real S${D.venta_real_sem[0]}–S${D.venta_real_sem[1]} ${A1}</td><td>${pillDelta(dlt(of,orr),Math.abs(of-orr),U.sesgo)}</td><td>—</td><td></td></tr>`;return;}
+    h+=`<tr class="row${filtroCad===c.subcadena?' open':''}" tabindex="0" data-cad="${esc(c.subcadena)}"><td class="l">${esc(c.subcadena)}</td><td>${fT(c.fcst)}</td><td colspan="7" class="l note">Sin Sell In en los archivos: se mantiene tu FCST y solo se compara contra SOP a nivel SKU.</td></tr>`;});
   const tAll=tf+D.no_retail.reduce((a,c)=>a+c.fcst,0);
   h+=`<tr class="tot"><td class="l">Total todos los canales</td><td>${fT(tAll)}</td><td colspan="7" class="l note">SOP ${D.mes_abrev}: ${fT(sopTot)} t (${fP(dlt(tAll,sopTot))})</td></tr></tbody>`;
   $('#t-cad').innerHTML=h;
@@ -307,7 +311,7 @@ function filas(){
   }).filter(Boolean);
 }
 function upliftDe(sem){const ws=Object.keys(D.pesos_act).map(Number);const w0=Math.min(...ws);const prev=D.semanas_fcst.filter(w=>w<w0&&w>=w0-4);
-  const pp=prev.reduce((a,w)=>a+(sem[w]||0),0)/(prev.length||1);const nm=ws.reduce((a,w)=>a+D.pesos_act[w]*(sem[w]??sem[D.ult_fcst]??0),0)/(D.dias_mes/7);return pp>0?nm/pp-1:null;}
+  const pp=prev.reduce((a,w)=>a+(sem[w]||0),0)/(prev.length||1);const nm=ws.reduce((a,w)=>a+D.pesos_act[w]*(sem[w]??sem[D.ult_fcst]??0),0)/D.sem_mes;return pp>0?nm/pp-1:null;}
 function pasaChip(r){
   if(chip==='todos')return true;
   if(chip==='alerta')return r.flags.length>0;
@@ -406,11 +410,11 @@ function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeou
 
 /* ---------- metodología ---------- */
 $('#metodo').innerHTML=`
-<div><h3>FCST ${MES}</h3><p>Suma de tus semanas del forecast, prorrateadas por días: ${pesos}${D.proxy_semanas.length?`. La S${D.proxy_semanas.join(', S')} no viene en el archivo y se toma igual a la S${D.ult_fcst}`:''}. Las promociones ya están cargadas en esas semanas.</p>
+<div><h3>FCST ${MES}</h3><p>Suma de tus semanas del forecast, con semanas de lunes a sábado (cada día = 1/6 de semana): ${pesos}${D.proxy_semanas.length?`. La S${D.proxy_semanas.join(', S')} no viene en el archivo y se toma igual a la S${D.ult_fcst}`:''}. Las promociones ya están cargadas en esas semanas.</p>
 <p>El <b>SOP ${D.mes_abrev}</b> es la columna del archivo, que viene por SKU (total de canales), así que se compara contra el FCST de todos los canales.</p></div>
 <div><h3>Referencia histórica</h3><p>Promedio de dos métodos, solo para supermercados:</p>
 <p><b>A · Mismo mes del año pasado:</b> Sell In ${MES} ${A0} × ritmo ${A1}/${A0} (Sell In S${D.sem_yoy[0]}–S${D.sem_yoy[1]} de ambos años, acotado entre ${YOYS()}).</p>
-<p><b>B · Ritmo actual con estacionalidad:</b> promedio semanal S${D.sem_rr[0]}–S${D.sem_rr[1]} ${A1} × (semana promedio de ${MES} ${A0} ÷ semana promedio S${D.sem_rr[0]}–S${D.sem_rr[1]} ${A0}) × ${D.dias_mes} días.</p></div>
+<p><b>B · Ritmo actual con estacionalidad:</b> promedio semanal S${D.sem_rr[0]}–S${D.sem_rr[1]} ${A1} × (semana promedio de ${MES} ${A0} ÷ semana promedio S${D.sem_rr[0]}–S${D.sem_rr[1]} ${A0}) × ${fT(D.sem_mes)} semanas del mes.</p>${D.venta_real_sem?`<p><b>Canal Tradicional</b> (incluye Operadores y Mayoristas, sin Alvi): no tiene ${A0}, así que su base es el Sell In real de venta normal S${D.venta_real_sem[0]}–S${D.venta_real_sem[1]} ${A1} (semana promedio) × ${fT(D.sem_mes)} semanas.</p>`:''}</div>
 <div><h3>Precio</h3><p>Precio por caja ponderado por Sell In. Se compara el precio de las últimas 2 semanas con datos (hasta S${D.ult_real}) contra el de ${MES} ${A0}. El Δ real descuenta 4,1% de inflación, igual que en tu hoja Leyenda. Colores como en tu Leyenda: rojo = precio subió, verde = precio bajó.</p>
 <p>No se aplica elasticidad a la referencia: el precio aparece como alerta para que decidas el ajuste.</p></div>
 <div><h3>Alertas</h3><p><span class="pill p-merma">naranjo</span> = FCST alto, riesgo de merma. <span class="pill p-quiebre">rojo</span> = FCST bajo, riesgo de quiebre. Solo se marcan desvíos de al menos ${U.minT} t.</p>
@@ -434,18 +438,18 @@ function efectoPromo(p,c){
   }
   if(/tottus/i.test(p.nombre)&&ref!=null){
     const w0=inicioPromo(p);if(w0==null)return {inc:0,tipo:'base',txt:`${p.cadena}: ${p.nombre}, sin fecha de inicio`};
-    const bw=ref/(D.dias_mes/7);let inc=0;
+    const bw=ref/D.sem_mes;let inc=0;
     Object.entries(D.pesos_act).forEach(([w,pe])=>{const k=String(+w-w0);inc+=pe*bw*((CURVA_TOTTUS[k]??1)-1);});
     return {inc,tipo:'curva',txt:`${p.cadena}: curva Tottus desde S${w0} → ${Math.abs(inc)<0.05?'sin efecto en '+MES+' (fuera de la ventana de la curva)':(inc>0?'+':'')+fT(inc)+' t'}`};
   }
   return {inc:0,tipo:'base',txt:`${p.cadena}: ${p.nombre.replace(/\s*\(.*$/,'')} (vigente desde antes, ya está en la base)`};
 }
 const PUENTE=S.map(s=>{
-  let ref=0,nobase=0,promo=0;const txt=[],porCad=[],nuevas=[],promoCad={};
+  let ref=0,nobase=0,promo=0,realb=0;const txt=[],porCad=[],nuevas=[],promoCad={};
   s.cadenas.forEach(c=>{
     const pr=s.promos.filter(p=>p.vigente&&p.cadena===c.subcadena).map(p=>efectoPromo(p,c));
     const inc=pr.reduce((a,e)=>a+e.inc,0);promo+=inc;pr.forEach(e=>txt.push(e.txt));if(inc>0.05)promoCad[c.subcadena]=inc;
-    if(conHist(c)){ref+=c.ref;porCad.push({cad:c.subcadena,res:c.fcst-c.ref-inc,fcst:c.fcst,ref:c.ref});}else{nobase+=c.fcst;if(c.retail&&c.fcst>=1)nuevas.push(c.subcadena);}
+    if(conHist(c)){ref+=c.ref;if(c.fuente==='real')realb+=c.ref;porCad.push({cad:c.subcadena,res:c.fcst-c.ref-inc,fcst:c.fcst,ref:c.ref,real:c.fuente==='real'});}else{nobase+=c.fcst;if(c.retail&&c.fcst>=1)nuevas.push(c.subcadena);}
   });
   const base=ref+nobase, tend=base-s.sop, sinexp=s.fcst-base-promo, gap=s.fcst-s.sop;
   const tol=Math.max(U.minT,0.05*s.sop);
@@ -453,14 +457,15 @@ const PUENTE=S.map(s=>{
   const estado=Math.abs(sinexp)<=tol?'ok':(sinexp>0?'sobre':'bajo');
   const prop=base+promo, cov=s.fcst>0?(s.fcst-nobase)/s.fcst:0;
   const ab=s.metA!=null&&s.metB!=null?Math.abs(s.metA-s.metB)/((s.metA+s.metB)/2||1):null;
-  const conf=(cov<0.4||ref<5||(ab!=null&&ab>0.5))?'baja':(cov>=0.7&&(ab==null||ab<=0.2))?'alta':'media';
+  let conf=(cov<0.4||ref<5||(ab!=null&&ab>0.5))?'baja':(cov>=0.7&&(ab==null||ab<=0.2))?'alta':'media';
+  if(conf==='alta'&&base+promo>0&&realb/(base+promo)>0.4)conf='media';   // base mayormente de 6 semanas 2026 sin estacionalidad
   return {sku:s.sku,producto:s.producto,subcat:s.subcat,sop:s.sop,fcst:s.fcst,gap,dgap:dlt(s.fcst,s.sop),ref,nobase,tend,promo,precio:0,sinexp,estado,tol,top,txt:[...new Set(txt)],dp_real:s.dp_real,
     prop,dprop:dlt(prop,s.sop),dpf:prop-s.fcst,dpfp:dlt(prop,s.fcst),cov,conf,porCad,nuevas,promoCad};
 });
 let chipP='sin', qP='';
 function explicacion(r){
   const p=[];
-  p.push(`Historia supermercados ${fT(r.ref)} t + otros canales ${fT(r.nobase)} t (tu FCST) = base ${fT(r.ref+r.nobase)} t, ${r.tend>=0?'+':''}${fT(r.tend)} t vs SOP.`);
+  p.push(`Historia supermercados ${fT(r.ref)} t + otros canales sin historia ${fT(r.nobase)} t (tu FCST) = base ${fT(r.ref+r.nobase)} t, ${r.tend>=0?'+':''}${fT(r.tend)} t vs SOP.`);
   if(r.promo>0.05)p.push(`Promos con volumen: +${fT(r.promo)} t.`);
   if(r.estado!=='ok'&&r.top)p.push(`Sin explicar ${r.sinexp>0?'+':''}${fT(r.sinexp)} t, sobre todo en ${r.top.cad} (${r.top.res>0?'+':''}${fT(r.top.res)} t sobre su historia${r.promo>0?' y promo':''}).`);
   if(r.dp_real!=null&&Math.abs(r.dp_real)>=U.precio)p.push(`Precio real ${fP(r.dp_real)} vs ${MES} ${A0}: efecto pendiente del archivo ${A0}.`);
@@ -518,7 +523,7 @@ $('#copiar-p').addEventListener('click',()=>{
   const txt=lines.join('\n');const ok=()=>toast(`Copiadas ${window._rp.length} filas del puente.`);
   try{navigator.clipboard.writeText(txt).then(ok,()=>fallback(txt));}catch(e){fallback(txt);}
 });
-$('#metodo').insertAdjacentHTML('afterbegin',`<div><h3>Puente SOP → FCST</h3><p>Por SKU, el desvío FCST − SOP se reparte en: <b>Tendencia histórica</b> = base − SOP, donde la base es la referencia histórica de cada cadena de supermercados más tu FCST de los canales sin historia (Tradicional, CCU, Industrial); <b>Promos con volumen</b> = lo pactado sobre la base de esa cadena (Cencosud), o la curva de Tottus de tu Leyenda según la semana de inicio; las promos vigentes desde antes (Lista 4, EDLP, Ciclo 5, Solo Base) ya están en la base y suman 0; <b>Precio</b> queda pendiente hasta tener ${A0}; <b>Sin explicar</b> = lo que resta.</p></div>`);
+$('#metodo').insertAdjacentHTML('afterbegin',`<div><h3>Puente SOP → FCST</h3><p>Por SKU, el desvío FCST − SOP se reparte en: <b>Tendencia histórica</b> = base − SOP, donde la base es la referencia histórica de cada cadena de supermercados más la venta real 2026 de Canal Tradicional y tu FCST de los canales sin historia (CCU, Industrial); <b>Promos con volumen</b> = lo pactado sobre la base de esa cadena (Cencosud), o la curva de Tottus de tu Leyenda según la semana de inicio; las promos vigentes desde antes (Lista 4, EDLP, Ciclo 5, Solo Base) ya están en la base y suman 0; <b>Precio</b> queda pendiente hasta tener ${A0}; <b>Sin explicar</b> = lo que resta.</p></div>`);
 
 
 /* ---------- foco por SKU ---------- */
@@ -529,7 +534,7 @@ $('#sc-f').innerHTML='<option value="">Todas las subcategorías</option>'+subcat
 function porQue(r){
   const p=[];
   const top=r.porCad.filter(c=>Math.abs(c.res)>=1).sort((a,b)=>Math.abs(b.res)-Math.abs(a.res)).slice(0,2);
-  top.forEach(c=>p.push(`${c.cad}: tu FCST ${fT(c.fcst)} t vs historia ${fT(c.ref)} t${r.promoCad[c.cad]?` + promo ${fT(r.promoCad[c.cad])} t`:''}`));
+  top.forEach(c=>p.push(`${c.cad}: tu FCST ${fT(c.fcst)} t vs ${c.real?`venta real S${D.venta_real_sem[0]}–${D.venta_real_sem[1]}`:'historia'} ${fT(c.ref)} t${r.promoCad[c.cad]?` + promo ${fT(r.promoCad[c.cad])} t`:''}`));
   Object.entries(r.promoCad).filter(([k])=>!top.some(c=>c.cad===k)).forEach(([k,v])=>p.push(`promo ${k} +${fT(v)} t sobre su base`));
   if(r.nobase>=1)p.push(`${fT(r.nobase)} t de canales sin historia (${r.nuevas.length?'incluye '+r.nuevas.join(', ')+' sin venta previa; ':''}se mantiene tu FCST)`);
   if(r.dp_real!=null&&Math.abs(r.dp_real)>=U.precio)p.push(`precio real ${fP(r.dp_real)} vs ${MES} ${A0} (efecto pendiente)`);
@@ -555,7 +560,7 @@ function drawFoco(){
   $('#t-foco').innerHTML=h;window._rf=rs;
   const all=PUENTE, tS=all.reduce((a,r)=>a+r.sop,0), tF=all.reduce((a,r)=>a+r.fcst,0), tP=all.reduce((a,r)=>a+r.prop,0);
   $('#nota-foco-top').textContent=`${all.filter(r=>desv(r.dgap,r.gap)).length} de ${all.length} SKU desviados vs SOP · SOP ${fT(tS)} t · tu FCST ${fT(tF)} t (${fP(dlt(tF,tS))}) · propuesto ${fT(tP)} t (${fP(dlt(tP,tS))})`;
-  $('#nota-foco').innerHTML=`<b>Desviado</b> = |Δ| de al menos ${fP(UF.pct,false)} y ${UF.t} t. <b>FCST propuesto</b> = historia de cada cadena de supermercados (Sell In ${MES} ${A0} ajustado por el ritmo ${A1}, y ritmo reciente ajustado por estacionalidad) + el volumen de promos sobre esa base + tu FCST en los canales sin historia (Tradicional, CCU, Industrial y cadenas donde el SKU no vendía antes). Todavía no incluye el efecto precio. <b>Confianza</b>: alta si al menos 70% del volumen tiene historia y los dos métodos coinciden en ±20%; baja si menos de 40% tiene historia, la historia es menor a 5 t o los métodos difieren más de 50%. Haz clic en un SKU para ver su detalle por cadena.`;
+  $('#nota-foco').innerHTML=`<b>Desviado</b> = |Δ| de al menos ${fP(UF.pct,false)} y ${UF.t} t. <b>FCST propuesto</b> = historia de cada cadena de supermercados (Sell In ${MES} ${A0} ajustado por el ritmo ${A1}, y ritmo reciente ajustado por estacionalidad) + el volumen de promos sobre esa base + la venta real S${D.venta_real_sem?D.venta_real_sem.join('–S'):'—'} de Canal Tradicional + tu FCST en los canales sin historia (CCU, Industrial y cadenas donde el SKU no vendía antes). Todavía no incluye el efecto precio. <b>Confianza</b>: alta si al menos 70% del volumen tiene historia y los dos métodos coinciden en ±20% (baja a media si más del 40% viene de la venta real de Canal Tradicional, que solo tiene 6 semanas y no tiene estacionalidad); baja si menos de 40% tiene historia, la historia es menor a 5 t o los métodos difieren más de 50%. Haz clic en un SKU para ver su detalle por cadena.`;
 }
 $('#chips-f').addEventListener('click',e=>{const b=e.target.closest('[data-chip]');if(b){chipF=b.dataset.chip;drawFoco();}});
 $('#q-f').addEventListener('input',e=>{qF=e.target.value.trim().toLowerCase();drawFoco();});

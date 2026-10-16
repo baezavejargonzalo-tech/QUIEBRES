@@ -38,11 +38,37 @@ AQUI = Path(__file__).resolve().parent
 
 
 def pesos_mes(anio, mes):
-    """Peso de cada semana ISO dentro del mes: días de la semana que caen en el mes / 7."""
+    """Peso de cada semana ISO dentro del mes, con semana de lunes a sábado:
+    días hábiles (lun–sáb) de la semana que caen en el mes / 6. El domingo no cuenta.
+    Noviembre 2026 = S45 + S46 + S47 + S48 + S49 × 1/6."""
     pesos = defaultdict(float)
     for d in range(1, calendar.monthrange(anio, mes)[1] + 1):
-        pesos[dt.date(anio, mes, d).isocalendar()[1]] += 1 / 7
-    return dict(pesos)
+        f = dt.date(anio, mes, d)
+        if f.weekday() < 6:
+            pesos[f.isocalendar()[1]] += 1 / 6
+    return {w: p for w, p in pesos.items() if p > 1e-9}
+
+
+# Canales sin historia en la hoja de precios que se toman del archivo de venta real (TP):
+# FCST "CANAL TRADICIONAL" = gerencia TRADICIONAL Y REGIONES (incluye Operadores y Mayoristas), sin Alvi.
+def leer_venta_real(path):
+    """Sell In real por SKU y semana para Canal Tradicional. Solo VENTA NORMAL
+    (se excluyen venta intermedia y liquidación, que son salidas de stock y no demanda)."""
+    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    filas = wb.worksheets[0].iter_rows(values_only=True)
+    h = {str(c).strip(): i for i, c in enumerate(next(filas)) if c is not None}
+    ig, ic, it, isk, iw, isi, ia = (h["Gerencia de Venta"], h["Cadena Cliente"], h["Tipo de Venta"], h["SKU"],
+                                     h["Semana"], h["Venta Fisica SelI In (TON)"], h["Año"])
+    out = defaultdict(lambda: defaultdict(float))
+    semanas = set()
+    for r in filas:
+        if r[ig] != "TRADICIONAL Y REGIONES" or r[ic] == "ALVI SUPERMERCADOS" or r[it] != "VENTA NORMAL":
+            continue
+        if not isinstance(r[isk], (int, float)) or not isinstance(r[iw], (int, float)):
+            continue
+        out[int(r[isk])][int(r[iw])] += num(r[isi])
+        semanas.add((int(r[ia]), int(r[iw])))
+    return {"CANAL TRADICIONAL": out}, sorted(semanas)
 
 
 def num(v):
@@ -133,7 +159,7 @@ def aplicar_promo_cenco(fcst, promo):
             f["promo"], f["promo_dur"], f["vol_pactado"] = promo["nombre"], promo["duracion"], round(p[f["subcadena"]], 3)
 
 
-def construir(xlsx, anio, mes, promo=None):
+def construir(xlsx, anio, mes, promo=None, venta_real=None):
     wb = openpyxl.load_workbook(xlsx, read_only=True, data_only=True)
     fcst, semanas_fcst = leer_fcst(wb, mes)
     if promo:
@@ -150,6 +176,9 @@ def construir(xlsx, anio, mes, promo=None):
     sem_yoy = [w for w in sem_reales]
     sem_rr = [w for w in sem_reales if w > ult_real - SEMANAS_RUNRATE]
     dias_mes = calendar.monthrange(anio, mes)[1]
+    sem_act = sum(w_act.values())   # semanas equivalentes del mes (lun–sáb)
+    sem_ant = sum(w_ant.values())
+    vr, vr_sem = venta_real if venta_real else ({}, [])
 
     sem_overlap = [w for w in semanas_fcst if w in sem_reales]
 
@@ -204,19 +233,19 @@ def construir(xlsx, anio, mes, promo=None):
         yoy = base_act / base_ant if base_ant > 0 else None
         rr_act = sum(g(w, "si1") for w in sem_rr) / len(sem_rr)
         rr_ant = sum(g(w, "si0") for w in sem_rr) / len(sem_rr)
-        estac = (si_mes_ant / (dias_mes / 7)) / rr_ant if rr_ant > 0 and si_mes_ant > 0 else None
+        estac = (si_mes_ant / sem_ant) / rr_ant if rr_ant > 0 and si_mes_ant > 0 else None
         yoy_s, estac_s = yoy, estac
         if prior:
             if prior.get("yoy") and base_ant > 0:
                 yoy_s = (base_act + K_YOY * prior["yoy"]) / (base_ant + K_YOY)
             if prior.get("estac") and rr_ant > 0 and si_mes_ant > 0:
-                estac_s = (si_mes_ant / (dias_mes / 7) + K_ESTAC * prior["estac"]) / (rr_ant + K_ESTAC)
+                estac_s = (si_mes_ant / sem_ant + K_ESTAC * prior["estac"]) / (rr_ant + K_ESTAC)
         if estac_s:
             estac_s = min(max(estac_s, ESTAC_MIN), ESTAC_MAX)
         yoy_c = min(max(yoy_s, YOY_MIN), YOY_MAX) if yoy_s else None
         estac = estac_s
         metA = si_mes_ant * yoy_c if (yoy_c and si_mes_ant > 0) else None
-        metB = rr_act * (estac if estac else 1.0) * dias_mes / 7 if rr_act > 0 else None
+        metB = rr_act * (estac if estac else 1.0) * sem_act if rr_act > 0 else None
         refs = [m for m in (metA, metB) if m is not None]
         ref = sum(refs) / len(refs) if refs else (0.0 if base_act == 0 and si_mes_ant == 0 else None)
         # precios: promedio ponderado por volumen
@@ -231,7 +260,7 @@ def construir(xlsx, anio, mes, promo=None):
         dp_real = (1 + dp_nom) / (1 + INFLACION) - 1 if dp_nom is not None else None
         return {
             "si_mes_ant": si_mes_ant, "so_mes_ant": so_mes_ant, "yoy": yoy,
-            "rr": rr_act * dias_mes / 7, "estac": estac, "metA": metA, "metB": metB, "ref": ref,
+            "rr": rr_act * sem_act, "estac": estac, "metA": metA, "metB": metB, "ref": ref,
             "p_ant": p_ant, "p_act": p_act, "dp_nom": dp_nom, "dp_real": dp_real,
         }
 
@@ -273,13 +302,22 @@ def construir(xlsx, anio, mes, promo=None):
                 acumular(cadena_h[c["subcadena"]], hc)
                 row.update(metricas(h1, priors.get(c["subcadena"])))
                 row.update(sesgo(c["sem"], h1))
+            elif c["subcadena"] in vr and vr_sem:
+                # base desde venta real 2026 (sin año anterior): ritmo semanal × semanas del mes
+                semv = [w for _, w in vr_sem]
+                real = vr[c["subcadena"]].get(s["sku"], {})
+                tot_r = sum(real.get(w, 0) for w in semv)
+                f_ov = sum(c["sem"].get(w, 0) for w in semv)
+                row.update({"ref": tot_r / len(semv) * sem_act, "metB": tot_r / len(semv) * sem_act, "metA": None,
+                            "rr": tot_r / len(semv) * sem_act, "fuente": "real",
+                            "sesgo": f_ov / tot_r - 1 if tot_r > 0 else None, "ov_fcst": f_ov, "ov_real": tot_r})
             cads.append(row)
         m = metricas(h_sku) if h_sku else {}
         if h_sku:
             m.update(sesgo(s["fcst_sem_ret"], h_sku))
         prev = [w for w in semanas_fcst if w < min(w_act) and w >= min(w_act) - 4]
         prom_prev = sum(s["fcst_sem"].get(w, 0) for w in prev) / len(prev) if prev else 0
-        prom_mes = s["fcst"] / (dias_mes / 7)
+        prom_mes = s["fcst"] / sem_act
         salida.append({
             "sku": s["sku"], "producto": s["producto"], "subcat": s["subcat"],
             "fcst": s["fcst"], "sop": s["sop"], "fcst_ret": s["fcst_ret"],
@@ -315,7 +353,9 @@ def construir(xlsx, anio, mes, promo=None):
 
     return {
         "anio": anio, "mes": mes, "mes_nombre": MESES_LARGO[mes - 1], "mes_abrev": MESES[mes - 1],
-        "dias_mes": dias_mes,
+        "dias_mes": dias_mes, "sem_mes": sem_act, "sem_mes_ant": sem_ant,
+        "venta_real_sem": [min(w for _, w in vr_sem), max(w for _, w in vr_sem)] if vr_sem else None,
+        "venta_real_cad": sorted(vr),
         "archivo": Path(xlsx).name.split("-", 1)[-1] if re.match(r"^[0-9a-f]{8}-", Path(xlsx).name) else Path(xlsx).name,
         "generado": dt.date.today().strftime("%d-%m-%Y"),
         "pesos_act": {w: round(p, 4) for w, p in sorted(w_act.items())},
@@ -351,6 +391,7 @@ def main():
     ap.add_argument("--mes", type=int, default=sig.month, help="mes a proyectar (por defecto, el próximo)")
     ap.add_argument("--anio", type=int, default=sig.year)
     ap.add_argument("--out", default=None)
+    ap.add_argument("--venta-real", default=None, help="archivo TP de venta real (Sell In por semana) para Canal Tradicional")
     ap.add_argument("--promo-cenco", default=None, help="archivo de promos Cencosud diferenciado Jumbo / Santa Isabel")
     ap.add_argument("--promo-nombre", default=None)
     ap.add_argument("--promo-duracion", default=None)
@@ -362,7 +403,8 @@ def main():
         promo = {"datos": leer_promo(a.promo_cenco),
                  "nombre": a.promo_nombre or f"Promo Cencosud {MESES[a.mes - 1].capitalize()}.",
                  "duracion": a.promo_duracion or f"{MESES_LARGO[a.mes - 1].capitalize()} {a.anio}"}
-    datos = redondear(construir(a.xlsx, a.anio, a.mes, promo))
+    venta_real = leer_venta_real(a.venta_real) if a.venta_real else None
+    datos = redondear(construir(a.xlsx, a.anio, a.mes, promo, venta_real))
     plantilla = (AQUI / "plantilla.html").read_text(encoding="utf-8")
     html = plantilla.replace("/*__DATOS__*/null", json.dumps(datos, ensure_ascii=False, separators=(",", ":")))
     html = html.replace("__TITULO__", f"Forecast {MESES_LARGO[a.mes - 1].capitalize()} {a.anio}")
