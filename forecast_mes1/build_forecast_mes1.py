@@ -29,6 +29,10 @@ MESES_LARGO = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
 INFLACION = 0.041          # inflación anual estimada (misma que la hoja Leyenda)
 SEMANAS_RUNRATE = 8        # semanas recientes para el ritmo actual
 YOY_MIN, YOY_MAX = 0.3, 3.0
+# Suavizado por SKU×cadena hacia el promedio de su cadena (los SKU chicos son ruidosos):
+K_YOY = 30.0               # t de Sell In (semanas de comparación) que "pesa" el ritmo de la cadena
+K_ESTAC = 2.0              # t/semana que "pesa" la estacionalidad de la cadena
+ESTAC_MIN, ESTAC_MAX = 0.6, 1.6
 
 AQUI = Path(__file__).resolve().parent
 
@@ -189,18 +193,28 @@ def construir(xlsx, anio, mes, promo=None):
                 "vigente": promo_vigente(f["promo"], f["promo_dur"], anio, mes),
             })
 
-    def metricas(h_por_sem):
-        """h_por_sem: semana -> dict sumado (si0, si1, so0, so1, p0w, p1w, q0, q1)."""
+    def metricas(h_por_sem, prior=None):
+        """h_por_sem: semana -> dict sumado (si0, si1, so0, so1, p0w, p1w, q0, q1).
+        prior: {"yoy", "estac"} de la cadena para suavizar los factores de un SKU."""
         g = lambda w, k: h_por_sem.get(w, {}).get(k, 0.0)
         si_mes_ant = sum(p * g(w, "si0") for w, p in w_ant.items())
         so_mes_ant = sum(p * g(w, "so0") for w, p in w_ant.items())
         base_ant = sum(g(w, "si0") for w in sem_yoy)
         base_act = sum(g(w, "si1") for w in sem_yoy)
         yoy = base_act / base_ant if base_ant > 0 else None
-        yoy_c = min(max(yoy, YOY_MIN), YOY_MAX) if yoy else None
         rr_act = sum(g(w, "si1") for w in sem_rr) / len(sem_rr)
         rr_ant = sum(g(w, "si0") for w in sem_rr) / len(sem_rr)
         estac = (si_mes_ant / (dias_mes / 7)) / rr_ant if rr_ant > 0 and si_mes_ant > 0 else None
+        yoy_s, estac_s = yoy, estac
+        if prior:
+            if prior.get("yoy") and base_ant > 0:
+                yoy_s = (base_act + K_YOY * prior["yoy"]) / (base_ant + K_YOY)
+            if prior.get("estac") and rr_ant > 0 and si_mes_ant > 0:
+                estac_s = (si_mes_ant / (dias_mes / 7) + K_ESTAC * prior["estac"]) / (rr_ant + K_ESTAC)
+        if estac_s:
+            estac_s = min(max(estac_s, ESTAC_MIN), ESTAC_MAX)
+        yoy_c = min(max(yoy_s, YOY_MIN), YOY_MAX) if yoy_s else None
+        estac = estac_s
         metA = si_mes_ant * yoy_c if (yoy_c and si_mes_ant > 0) else None
         metB = rr_act * (estac if estac else 1.0) * dias_mes / 7 if rr_act > 0 else None
         refs = [m for m in (metA, metB) if m is not None]
@@ -238,6 +252,12 @@ def construir(xlsx, anio, mes, promo=None):
     total_h = {}
     cadena_h = defaultdict(dict)
     salida = []
+    pre = defaultdict(dict)
+    for s in skus.values():
+        for c in s["cadenas"].values():
+            if (s["sku"], c["subcadena"]) in hist:
+                acumular(pre[c["subcadena"]], hist[(s["sku"], c["subcadena"])])
+    priors = {cad: {k: m[k] for k in ("yoy", "estac")} for cad, h in pre.items() for m in [metricas(h)]}
     for s in skus.values():
         h_sku = {}
         cads = []
@@ -251,7 +271,7 @@ def construir(xlsx, anio, mes, promo=None):
                 acumular(h_sku, hc)
                 acumular(total_h, hc)
                 acumular(cadena_h[c["subcadena"]], hc)
-                row.update(metricas(h1))
+                row.update(metricas(h1, priors.get(c["subcadena"])))
                 row.update(sesgo(c["sem"], h1))
             cads.append(row)
         m = metricas(h_sku) if h_sku else {}

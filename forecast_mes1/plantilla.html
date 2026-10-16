@@ -93,6 +93,19 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 
   <div class="kpis" id="kpis"></div>
 
+  <section id="sec-foco">
+    <div class="sec-head">
+      <h2>Foco por SKU: FCST vs SOP y propuesta</h2>
+      <span class="note" id="nota-foco-top"></span>
+    </div>
+    <div class="sec-head">
+      <div class="ctrls" id="chips-f"></div>
+      <div class="ctrls"><input type="search" id="q-f" placeholder="Buscar SKU o producto" aria-label="Buscar en foco por SKU"><select id="sc-f" aria-label="Subcategoría"></select><button class="btn" id="copiar-f" type="button">Copiar para Excel</button></div>
+    </div>
+    <div class="card tight"><table id="t-foco"></table></div>
+    <div class="note" id="nota-foco"></div>
+  </section>
+
   <section id="sec-puente">
     <div class="sec-head">
       <h2>Puente SOP → FCST</h2>
@@ -410,9 +423,10 @@ function YOYS(){return '0,3× y 3×';}
 const CURVA_TOTTUS={'-2':0.64,'-1':1.69,'0':4.32,'1':2.48,'2':2.73,'3':1.25,'4':0.46};   // hoja Leyenda, promo sept. 2026
 function isoSemana(d){const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const dn=t.getUTCDay()||7;t.setUTCDate(t.getUTCDate()+4-dn);const y0=new Date(Date.UTC(t.getUTCFullYear(),0,1));return Math.ceil(((t-y0)/864e5+1)/7);}
 function inicioPromo(p){const m=String(p.duracion||'').match(/(\d{1,2})-(\d{1,2})-(\d{4})/);return m?isoSemana(new Date(+m[3],m[2]-1,+m[1])):null;}
+const conHist=c=>c&&c.ref!=null&&!(c.ref<0.5&&c.fcst>=1);   // ref≈0 con FCST: SKU nuevo en la cadena, sin base
 function efectoPromo(p,c){
   // devuelve {inc, tipo, txt}: toneladas incrementales sobre la base histórica de esa cadena
-  const ref=c&&c.ref!=null?c.ref:null;
+  const ref=conHist(c)?c.ref:null;
   if(p.vol>0){
     if(ref==null)return {inc:0,tipo:'sinbase',txt:`${p.cadena}: ${fT(p.vol)} t pactadas, sin historia para medir el incremental`};
     const inc=Math.max(0,p.vol-ref);
@@ -427,17 +441,21 @@ function efectoPromo(p,c){
   return {inc:0,tipo:'base',txt:`${p.cadena}: ${p.nombre.replace(/\s*\(.*$/,'')} (vigente desde antes, ya está en la base)`};
 }
 const PUENTE=S.map(s=>{
-  let ref=0,nobase=0,promo=0;const txt=[],porCad=[];
+  let ref=0,nobase=0,promo=0;const txt=[],porCad=[],nuevas=[],promoCad={};
   s.cadenas.forEach(c=>{
     const pr=s.promos.filter(p=>p.vigente&&p.cadena===c.subcadena).map(p=>efectoPromo(p,c));
-    const inc=pr.reduce((a,e)=>a+e.inc,0);promo+=inc;pr.forEach(e=>txt.push(e.txt));
-    if(c.ref!=null){ref+=c.ref;porCad.push({cad:c.subcadena,res:c.fcst-c.ref-inc});}else nobase+=c.fcst;
+    const inc=pr.reduce((a,e)=>a+e.inc,0);promo+=inc;pr.forEach(e=>txt.push(e.txt));if(inc>0.05)promoCad[c.subcadena]=inc;
+    if(conHist(c)){ref+=c.ref;porCad.push({cad:c.subcadena,res:c.fcst-c.ref-inc,fcst:c.fcst,ref:c.ref});}else{nobase+=c.fcst;if(c.retail&&c.fcst>=1)nuevas.push(c.subcadena);}
   });
   const base=ref+nobase, tend=base-s.sop, sinexp=s.fcst-base-promo, gap=s.fcst-s.sop;
   const tol=Math.max(U.minT,0.05*s.sop);
   const top=porCad.sort((a,b)=>Math.abs(b.res)-Math.abs(a.res))[0];
   const estado=Math.abs(sinexp)<=tol?'ok':(sinexp>0?'sobre':'bajo');
-  return {sku:s.sku,producto:s.producto,subcat:s.subcat,sop:s.sop,fcst:s.fcst,gap,dgap:dlt(s.fcst,s.sop),ref,nobase,tend,promo,precio:0,sinexp,estado,tol,top,txt:[...new Set(txt)],dp_real:s.dp_real};
+  const prop=base+promo, cov=s.fcst>0?(s.fcst-nobase)/s.fcst:0;
+  const ab=s.metA!=null&&s.metB!=null?Math.abs(s.metA-s.metB)/((s.metA+s.metB)/2||1):null;
+  const conf=(cov<0.4||ref<5||(ab!=null&&ab>0.5))?'baja':(cov>=0.7&&(ab==null||ab<=0.2))?'alta':'media';
+  return {sku:s.sku,producto:s.producto,subcat:s.subcat,sop:s.sop,fcst:s.fcst,gap,dgap:dlt(s.fcst,s.sop),ref,nobase,tend,promo,precio:0,sinexp,estado,tol,top,txt:[...new Set(txt)],dp_real:s.dp_real,
+    prop,dprop:dlt(prop,s.sop),dpf:prop-s.fcst,dpfp:dlt(prop,s.fcst),cov,conf,porCad,nuevas,promoCad};
 });
 let chipP='sin', qP='';
 function explicacion(r){
@@ -502,6 +520,57 @@ $('#copiar-p').addEventListener('click',()=>{
 });
 $('#metodo').insertAdjacentHTML('afterbegin',`<div><h3>Puente SOP → FCST</h3><p>Por SKU, el desvío FCST − SOP se reparte en: <b>Tendencia histórica</b> = base − SOP, donde la base es la referencia histórica de cada cadena de supermercados más tu FCST de los canales sin historia (Tradicional, CCU, Industrial); <b>Promos con volumen</b> = lo pactado sobre la base de esa cadena (Cencosud), o la curva de Tottus de tu Leyenda según la semana de inicio; las promos vigentes desde antes (Lista 4, EDLP, Ciclo 5, Solo Base) ya están en la base y suman 0; <b>Precio</b> queda pendiente hasta tener ${A0}; <b>Sin explicar</b> = lo que resta.</p></div>`);
 
-drawPuente();drawCad();drawSku();drawTotal();
-let rz;addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{drawTotal();if(abierto!=null){const r=window._rs.find(r=>r.sku===abierto);if(r)drawDetalle(r.base);}},150);});
+
+/* ---------- foco por SKU ---------- */
+const UF={pct:0.10,t:3};   // desviado: |Δ| ≥ 10% y ≥ 3 t
+const desv=(d,abs)=>d!=null&&Math.abs(d)>=UF.pct&&Math.abs(abs)>=UF.t;
+let chipF='desv', qF='', scF='', ordF={k:'agap',dir:-1};
+$('#sc-f').innerHTML='<option value="">Todas las subcategorías</option>'+subcats.map(x=>`<option>${esc(x)}</option>`).join('');
+function porQue(r){
+  const p=[];
+  const top=r.porCad.filter(c=>Math.abs(c.res)>=1).sort((a,b)=>Math.abs(b.res)-Math.abs(a.res)).slice(0,2);
+  top.forEach(c=>p.push(`${c.cad}: tu FCST ${fT(c.fcst)} t vs historia ${fT(c.ref)} t${r.promoCad[c.cad]?` + promo ${fT(r.promoCad[c.cad])} t`:''}`));
+  Object.entries(r.promoCad).filter(([k])=>!top.some(c=>c.cad===k)).forEach(([k,v])=>p.push(`promo ${k} +${fT(v)} t sobre su base`));
+  if(r.nobase>=1)p.push(`${fT(r.nobase)} t de canales sin historia (${r.nuevas.length?'incluye '+r.nuevas.join(', ')+' sin venta previa; ':''}se mantiene tu FCST)`);
+  if(r.dp_real!=null&&Math.abs(r.dp_real)>=U.precio)p.push(`precio real ${fP(r.dp_real)} vs ${MES} ${A0} (efecto pendiente)`);
+  if(desv(r.dgap,r.gap)&&!desv(r.dprop,r.prop-r.sop))p.push('la historia respalda el SOP');
+  if(desv(r.dgap,r.gap)&&desv(r.dprop,r.prop-r.sop)&&Math.sign(r.dgap)===Math.sign(r.dprop))p.push('la historia también se aleja del SOP en la misma dirección');
+  return p.join(' · ');
+}
+function drawFoco(){
+  const base=PUENTE.filter(r=>(!scF||r.subcat===scF)&&(!qF||String(r.sku).includes(qF)||r.producto.toLowerCase().includes(qF)));
+  const CH=[['desv','Desviados vs SOP'],['difprop','Propuesta ≠ tu FCST'],['sube','FCST sobre SOP'],['baja','FCST bajo SOP'],['todos','Todos']];
+  const pasa=(r,k)=>k==='todos'||(k==='desv'?desv(r.dgap,r.gap):k==='difprop'?desv(r.dpfp,r.dpf):k==='sube'?desv(r.dgap,r.gap)&&r.gap>0:desv(r.dgap,r.gap)&&r.gap<0);
+  $('#chips-f').innerHTML=CH.map(([k,t])=>`<button class="chip" type="button" data-chip="${k}" aria-pressed="${chipF===k}">${t}<span class="n">${base.filter(r=>pasa(r,k)).length}</span></button>`).join('');
+  const rs=base.filter(r=>pasa(r,chipF)).map(r=>({...r,agap:Math.abs(r.gap)}));
+  const k=ordF.k;rs.sort((a,b)=>{const va=a[k],vb=b[k];return typeof va==='string'?ordF.dir*va.localeCompare(vb):ordF.dir*((va??-1e9)-(vb??-1e9));});
+  const pd=(d,abs,thr=UF.pct)=>d==null||!isFinite(d)?'<span class="pill p-neu">—</span>':`<span class="pill ${Math.abs(d)>=thr&&Math.abs(abs)>=UF.t?(d>0?'p-merma':'p-quiebre'):'p-neu'}">${d>0?'▲ ':d<0?'▼ ':''}${fP(d)}</span>`;
+  const cf={alta:'<span class="pill p-ok">Alta</span>',media:'<span class="pill p-neu">Media</span>',baja:'<span class="pill p-quiebre" style="opacity:.85">Baja</span>'};
+  const C=[['producto','Producto',1],['sop',`SOP ${D.mes_abrev}`],['fcst',`Tu FCST ${MES}`],['dgap','Δ% tu FCST vs SOP'],['prop','FCST propuesto'],['dprop','Δ% propuesto vs SOP'],['dpf','Propuesto − tu FCST'],['conf','Confianza',1],['why','Por qué',1,1]];
+  let h='<thead><tr>'+C.map(([k,t,l,ns])=>`<th class="${l?'l ':''}${ns?'':'sort'}${ordF.k===k?' on':''}" ${ns?'':`data-k="${k}"`}>${t}${ordF.k===k?(ordF.dir>0?' ▲':' ▼'):''}</th>`).join('')+'</tr></thead><tbody>';
+  const sm={sop:0,fcst:0,prop:0};
+  rs.forEach(r=>{sm.sop+=r.sop;sm.fcst+=r.fcst;sm.prop+=r.prop;
+    h+=`<tr class="row" tabindex="0" data-sku="${r.sku}"><td class="l prod"><b>${esc(r.producto)}</b><span class="code">${r.sku} · ${esc(r.subcat)}</span></td><td>${fT(r.sop)}</td><td><b>${fT(r.fcst)}</b></td><td>${pd(r.dgap,r.gap)}</td><td><b>${fT(r.prop)}</b></td><td>${pd(r.dprop,r.prop-r.sop)}</td><td>${r.dpf>0.05?'+':''}${fT(r.dpf)} <span class="note">${fP(r.dpfp)}</span></td><td class="l">${cf[r.conf]}</td><td class="promo" style="max-width:440px;min-width:300px">${esc(porQue(r))}</td></tr>`;});
+  h+=`<tr class="tot"><td class="l">${rs.length} SKU</td><td>${fT(sm.sop)}</td><td>${fT(sm.fcst)}</td><td>${fP(dlt(sm.fcst,sm.sop))}</td><td>${fT(sm.prop)}</td><td>${fP(dlt(sm.prop,sm.sop))}</td><td>${sm.prop-sm.fcst>0?'+':''}${fT(sm.prop-sm.fcst)}</td><td></td><td></td></tr></tbody>`;
+  $('#t-foco').innerHTML=h;window._rf=rs;
+  const all=PUENTE, tS=all.reduce((a,r)=>a+r.sop,0), tF=all.reduce((a,r)=>a+r.fcst,0), tP=all.reduce((a,r)=>a+r.prop,0);
+  $('#nota-foco-top').textContent=`${all.filter(r=>desv(r.dgap,r.gap)).length} de ${all.length} SKU desviados vs SOP · SOP ${fT(tS)} t · tu FCST ${fT(tF)} t (${fP(dlt(tF,tS))}) · propuesto ${fT(tP)} t (${fP(dlt(tP,tS))})`;
+  $('#nota-foco').innerHTML=`<b>Desviado</b> = |Δ| de al menos ${fP(UF.pct,false)} y ${UF.t} t. <b>FCST propuesto</b> = historia de cada cadena de supermercados (Sell In ${MES} ${A0} ajustado por el ritmo ${A1}, y ritmo reciente ajustado por estacionalidad) + el volumen de promos sobre esa base + tu FCST en los canales sin historia (Tradicional, CCU, Industrial y cadenas donde el SKU no vendía antes). Todavía no incluye el efecto precio. <b>Confianza</b>: alta si al menos 70% del volumen tiene historia y los dos métodos coinciden en ±20%; baja si menos de 40% tiene historia, la historia es menor a 5 t o los métodos difieren más de 50%. Haz clic en un SKU para ver su detalle por cadena.`;
+}
+$('#chips-f').addEventListener('click',e=>{const b=e.target.closest('[data-chip]');if(b){chipF=b.dataset.chip;drawFoco();}});
+$('#q-f').addEventListener('input',e=>{qF=e.target.value.trim().toLowerCase();drawFoco();});
+$('#sc-f').addEventListener('input',e=>{scF=e.target.value;drawFoco();});
+$('#t-foco').addEventListener('click',e=>{const th=e.target.closest('th[data-k]');if(th){const k=th.dataset.k;ordF=ordF.k===k?{k,dir:-ordF.dir}:{k,dir:['producto','conf'].includes(k)?1:-1};drawFoco();return;}
+  const tr=e.target.closest('tr[data-sku]');if(tr)irSku(+tr.dataset.sku);});
+$('#t-foco').addEventListener('keydown',e=>{if(e.key==='Enter'){const tr=e.target.closest('tr[data-sku]');if(tr)irSku(+tr.dataset.sku);}});
+$('#copiar-f').addEventListener('click',()=>{
+  const num=v=>v==null||!isFinite(v)?'':String(Math.round(v*1000)/1000).replace('.',',');
+  const lines=[['SKU','Producto','Subcategoría',`SOP ${D.mes_abrev}`,`Tu FCST ${MES}`,'Δ% tu FCST vs SOP','FCST propuesto','Δ% propuesto vs SOP','Propuesto − tu FCST (t)','Confianza','Por qué'].join('\t'),
+    ...window._rf.map(r=>[r.sku,r.producto,r.subcat,num(r.sop),num(r.fcst),num(r.dgap),num(r.prop),num(r.dprop),num(r.dpf),r.conf,porQue(r).replace(/\t|\n/g,' ')].join('\t'))];
+  const txt=lines.join('\n');const ok=()=>toast(`Copiadas ${window._rf.length} filas.`);
+  try{navigator.clipboard.writeText(txt).then(ok,()=>fallback(txt));}catch(e){fallback(txt);}
+});
+
+drawFoco();drawPuente();drawCad();drawSku();drawTotal();
+let rz;addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{drawTotal();drawPuente();if(abierto!=null){const r=window._rs.find(r=>r.sku===abierto);if(r)drawDetalle(r.base);}},150);});
 </script>
