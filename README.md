@@ -36,6 +36,10 @@ El mes se arma con semanas de lunes a sábado: cada día hábil vale 1/6 de sema
 Para usar la venta real de Canal Tradicional (gerencia Tradicional y Regiones, con Operadores
 y Mayoristas, sin Alvi) como base, agrega `--venta-real tp.xlsx` (reporte de venta por semana).
 
+El efecto precio usa una elasticidad por subcategoría calculada con las semanas del año
+anterior de la hoja de precios. `--precio-yoy tp_mes.xlsx` (mismo mes en dos años) agrega un
+control de esa elasticidad.
+
 Para incluir promos de Cencosud diferenciadas Jumbo / Santa Isabel:
 
 ```

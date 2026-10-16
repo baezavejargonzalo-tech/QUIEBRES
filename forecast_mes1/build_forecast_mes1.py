@@ -51,6 +51,76 @@ def pesos_mes(anio, mes):
 
 # Canales sin historia en la hoja de precios que se toman del archivo de venta real (TP):
 # FCST "CANAL TRADICIONAL" = gerencia TRADICIONAL Y REGIONES (incluye Operadores y Mayoristas), sin Alvi.
+ELAST_TAU = 1.0                  # cuánto se confía en la elasticidad propia de la subcategoría vs la general
+ELAST_MIN, ELAST_MAX = -3.5, 0.0
+DP_MAX = 0.30                    # tope al Δ precio real usado para el efecto precio
+
+
+def elasticidades(hist, subcat_de):
+    """Elasticidad precio del Sell Out por subcategoría con las semanas del año anterior
+    (log volumen vs log precio dentro de cada SKU×cadena), suavizada hacia la general."""
+    import math
+    por_sub = defaultdict(list)
+    for (sku, sub), sem in hist.items():
+        pts = [(math.log(v["p0"]), math.log(v["so0"])) for v in sem.values()
+               if isinstance(v["p0"], (int, float)) and v["p0"] > 0 and isinstance(v["so0"], (int, float)) and v["so0"] > 0]
+        if len(pts) < 10:
+            continue
+        mp = sum(a for a, _ in pts) / len(pts)
+        mq = sum(b for _, b in pts) / len(pts)
+        por_sub[subcat_de.get(sku)].extend((a - mp, b - mq) for a, b in pts)
+    todos = [x for v in por_sub.values() for x in v]
+    sxx = sum(a * a for a, _ in todos)
+    e_pool = sum(a * b for a, b in todos) / sxx if sxx else -1.0
+    out = {}
+    for sc, pts in por_sub.items():
+        sxx = sum(a * a for a, _ in pts)
+        if sc is None or sxx < 1e-6 or len(pts) < 30:
+            continue
+        e = sum(a * b for a, b in pts) / sxx
+        se = (sum((b - e * a) ** 2 for a, b in pts) / (len(pts) - 1) / sxx) ** 0.5
+        w = ELAST_TAU ** 2 / (ELAST_TAU ** 2 + se ** 2)
+        out[sc] = {"bruta": e, "se": se, "n": len(pts),
+                   "usada": min(max(w * e + (1 - w) * e_pool, ELAST_MIN), ELAST_MAX)}
+    return out, min(max(e_pool, ELAST_MIN), ELAST_MAX)
+
+
+def elasticidad_yoy(path):
+    """Comparación entre SKU×cadena de un mismo mes en dos años (archivo TP mensual):
+    log(Δ volumen Sell Out) vs log(Δ precio), ponderado por volumen. Sirve de control."""
+    import math
+    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    filas = wb.worksheets[0].iter_rows(values_only=True)
+    h = {str(c).strip(): i for i, c in enumerate(next(filas)) if c is not None}
+    iso, ip, isk, isub, ia, im = (h["Venta Fisica Sell Out (TON)"], h["Precio Promedio SO"], h["SKU"],
+                                  h["SubCadena Cliente"], h["Año"], h["Mes"])
+    acc = defaultdict(lambda: [0.0, 0.0])
+    anios, mes = set(), None
+    for r in filas:
+        if not isinstance(r[ia], (int, float)) or not isinstance(r[ip], (int, float)) or not isinstance(r[iso], (int, float)) or r[iso] <= 0:
+            continue
+        k = (r[isk], r[isub], int(r[ia]))
+        acc[k][0] += r[iso]; acc[k][1] += r[ip] * r[iso]
+        anios.add(int(r[ia])); mes = int(r[im])
+    if len(anios) < 2:
+        return None
+    a0, a1 = min(anios), max(anios)
+    pts = []
+    for (sku, sub, a), (q, pw) in acc.items():
+        if a != a0 or (sku, sub, a1) not in acc:
+            continue
+        q1, pw1 = acc[(sku, sub, a1)]
+        if q > 1 and q1 > 0.3:
+            lp, lv = math.log((pw1 / q1) / (pw / q)), math.log(q1 / q)
+            if abs(lp) < 0.4 and abs(lv) < 1.5:
+                pts.append((lp, lv, q ** 0.5))
+    sw = sum(w for *_, w in pts)
+    mp = sum(a * w for a, _, w in pts) / sw
+    mv = sum(b * w for _, b, w in pts) / sw
+    e = sum(w * (a - mp) * (b - mv) for a, b, w in pts) / sum(w * (a - mp) ** 2 for a, _, w in pts)
+    return {"e": e, "n": len(pts), "mes": mes, "anios": [a0, a1]}
+
+
 def leer_venta_real(path):
     """Sell In real por SKU y semana para Canal Tradicional. Solo VENTA NORMAL
     (se excluyen venta intermedia y liquidación, que son salidas de stock y no demanda)."""
@@ -159,12 +229,13 @@ def aplicar_promo_cenco(fcst, promo):
             f["promo"], f["promo_dur"], f["vol_pactado"] = promo["nombre"], promo["duracion"], round(p[f["subcadena"]], 3)
 
 
-def construir(xlsx, anio, mes, promo=None, venta_real=None):
+def construir(xlsx, anio, mes, promo=None, venta_real=None, precio_yoy=None):
     wb = openpyxl.load_workbook(xlsx, read_only=True, data_only=True)
     fcst, semanas_fcst = leer_fcst(wb, mes)
     if promo:
         aplicar_promo_cenco(fcst, promo)
     hist = leer_precios(wb, anio)
+    elast, elast_pool = elasticidades(hist, {f["sku"]: f["subcat"] for f in fcst})
 
     w_act = pesos_mes(anio, mes)
     w_ant = pesos_mes(anio - 1, mes)
@@ -356,6 +427,7 @@ def construir(xlsx, anio, mes, promo=None, venta_real=None):
         "dias_mes": dias_mes, "sem_mes": sem_act, "sem_mes_ant": sem_ant,
         "venta_real_sem": [min(w for _, w in vr_sem), max(w for _, w in vr_sem)] if vr_sem else None,
         "venta_real_cad": sorted(vr),
+        "elast": elast, "elast_pool": elast_pool, "elast_yoy": precio_yoy, "dp_max": DP_MAX,
         "archivo": Path(xlsx).name.split("-", 1)[-1] if re.match(r"^[0-9a-f]{8}-", Path(xlsx).name) else Path(xlsx).name,
         "generado": dt.date.today().strftime("%d-%m-%Y"),
         "pesos_act": {w: round(p, 4) for w, p in sorted(w_act.items())},
@@ -392,6 +464,7 @@ def main():
     ap.add_argument("--anio", type=int, default=sig.year)
     ap.add_argument("--out", default=None)
     ap.add_argument("--venta-real", default=None, help="archivo TP de venta real (Sell In por semana) para Canal Tradicional")
+    ap.add_argument("--precio-yoy", default=None, help="archivo TP mensual con el mismo mes de dos años (control de elasticidad)")
     ap.add_argument("--promo-cenco", default=None, help="archivo de promos Cencosud diferenciado Jumbo / Santa Isabel")
     ap.add_argument("--promo-nombre", default=None)
     ap.add_argument("--promo-duracion", default=None)
@@ -404,7 +477,8 @@ def main():
                  "nombre": a.promo_nombre or f"Promo Cencosud {MESES[a.mes - 1].capitalize()}.",
                  "duracion": a.promo_duracion or f"{MESES_LARGO[a.mes - 1].capitalize()} {a.anio}"}
     venta_real = leer_venta_real(a.venta_real) if a.venta_real else None
-    datos = redondear(construir(a.xlsx, a.anio, a.mes, promo, venta_real))
+    precio_yoy = elasticidad_yoy(a.precio_yoy) if a.precio_yoy else None
+    datos = redondear(construir(a.xlsx, a.anio, a.mes, promo, venta_real, precio_yoy))
     plantilla = (AQUI / "plantilla.html").read_text(encoding="utf-8")
     html = plantilla.replace("/*__DATOS__*/null", json.dumps(datos, ensure_ascii=False, separators=(",", ":")))
     html = html.replace("__TITULO__", f"Forecast {MESES_LARGO[a.mes - 1].capitalize()} {a.anio}")
