@@ -301,8 +301,8 @@ def construir(xlsx, anio, mes, promo=None, venta_real=None, precio_yoy=None):
             })
 
     # SOP por SKU = suma del SOP de cada gerencia (NACIONAL, ECUSA, JUNAEB, INDUSTRIAL).
-    # Archivos antiguos repetían el SOP total del SKU en todas las gerencias: si la mayoría de las
-    # gerencias no nacionales repiten exactamente el de NACIONAL, se toma como formato antiguo y no se suman.
+    # Una gerencia cuyo SOP repite exactamente el de NACIONAL es arrastre y no se suma (así venían
+    # todas en el formato antiguo, y la fila INDUSTRIAL del Néctar Durazno en el nuevo).
     pares = [(s["sop_vals"]["NACIONAL"], vals) for s in skus.values() if "NACIONAL" in s["sop_vals"]
              for ger, vals in s["sop_vals"].items() if ger != "NACIONAL"]
     iguales = sum(1 for nac, vals in pares if vals[0][0] == nac[0][0])
@@ -320,11 +320,10 @@ def construir(xlsx, anio, mes, promo=None, venta_real=None, precio_yoy=None):
         tot = 0.0
         for ger, v in s["sop_ger"].items():
             if ger != "NACIONAL" and nac is not None and abs(v - nac) < 0.01 and v > 0:
-                if formato_antiguo:
-                    sop_dup.append({"sku": s["sku"], "gerencia": ger, "sop": v, "fcst": s["fcst_ger"][ger]})
-                    s["sop_ger"][ger] = None
-                    continue
-                sop_igual.append({"sku": s["sku"], "producto": s["producto"], "gerencia": ger, "sop": v, "fcst": s["fcst_ger"][ger]})
+                # el SOP de otra gerencia idéntico al de NACIONAL es arrastre de la búsqueda: no se suma
+                sop_dup.append({"sku": s["sku"], "gerencia": ger, "sop": v, "fcst": s["fcst_ger"][ger]})
+                s["sop_ger"][ger] = None
+                continue
             tot += v
         s["sop"] = tot
 
