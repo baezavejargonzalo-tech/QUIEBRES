@@ -1,0 +1,191 @@
+<title>Forecast Semana __S__</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=Source+Sans+3:wght@400;600;700&display=swap">
+<style>
+/* Layout: hoja de planificación — encabezado compacto, KPIs, curva semanal, luego tablas de trabajo a todo el ancho */
+:root{
+  --bg:#f5f7f9; --panel:#ffffff; --ink:#14212e; --muted:#5b6875; --line:#dbe2e8; --soft:#eef2f5;
+  --accent:#1d5c8f; --accent-soft:#d9e7f2; --y25:#9aa7b3;
+  --merma:#a86400; --merma-bg:#fbefdc; --quiebre:#b3261e; --quiebre-bg:#fae3e1; --ok:#2d7a4a; --ok-bg:#e1f1e6;
+  --f-display:"Archivo","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Source Sans 3","Segoe UI",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f161d; --panel:#16202a; --ink:#e4ebf1; --muted:#97a5b2; --line:#2a3743; --soft:#1c2834;
+  --accent:#6fb0e3; --accent-soft:#1d3447; --y25:#5f6e7b;
+  --merma:#e9a94b; --merma-bg:#3a2a12; --quiebre:#f08a80; --quiebre-bg:#3d1c1a; --ok:#6cc48d; --ok-bg:#16301f; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f161d; --panel:#16202a; --ink:#e4ebf1; --muted:#97a5b2; --line:#2a3743; --soft:#1c2834;
+  --accent:#6fb0e3; --accent-soft:#1d3447; --y25:#5f6e7b;
+  --merma:#e9a94b; --merma-bg:#3a2a12; --quiebre:#f08a80; --quiebre-bg:#3d1c1a; --ok:#6cc48d; --ok-bg:#16301f; color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45}
+.wrap{max-width:1360px;margin:0 auto;padding-block:28px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:28px}
+h1,h2,h3{font-family:var(--f-display);font-stretch:85%;margin:0;text-wrap:balance}
+h1{font-size:clamp(28px,4vw,40px);font-weight:800;letter-spacing:-.01em}
+h2{font-size:20px;font-weight:700}
+.eyebrow{font-family:var(--f-display);font-stretch:80%;text-transform:uppercase;letter-spacing:.08em;font-size:12px;font-weight:700;color:var(--accent)}
+.sub{color:var(--muted);font-size:14px;max-width:80ch}
+.num{font-variant-numeric:tabular-nums}
+header{display:flex;flex-direction:column;gap:6px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.kpi .lbl{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+.kpi .big{font-family:var(--f-display);font-stretch:85%;font-size:30px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1}
+.kpi .big small{font-size:15px;font-weight:600;color:var(--muted)}
+.kpi .cmp{font-size:13.5px;color:var(--muted)}
+.pill{display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.p-merma{background:var(--merma-bg);color:var(--merma)} .p-quiebre{background:var(--quiebre-bg);color:var(--quiebre)} .p-ok{background:var(--ok-bg);color:var(--ok)} .p-neu{background:var(--soft);color:var(--muted)} .p-acc{background:var(--accent-soft);color:var(--accent)}
+section{display:flex;flex-direction:column;gap:12px;min-width:0}
+.sec-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px 16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;min-width:0}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--muted)}
+.legend i{display:inline-block;width:18px;height:3px;border-radius:2px;vertical-align:middle;margin-right:6px}
+.chart{position:relative}
+.chart svg{display:block;width:100%;height:auto}
+.chart text{fill:var(--muted);font-size:11px;font-family:var(--f-body)}
+.tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12.5px;box-shadow:0 4px 14px rgb(0 0 0 / .12);white-space:nowrap;z-index:5}
+.tip b{font-family:var(--f-display);font-stretch:85%}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th{font-family:var(--f-display);font-stretch:85%;font-weight:700;font-size:12.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;position:sticky;top:0;background:var(--panel);z-index:1;vertical-align:bottom}
+th.sort{cursor:pointer;user-select:none} th.sort:hover{color:var(--ink)} th.on{color:var(--accent)}
+th.l,td.l{text-align:left}
+td{font-variant-numeric:tabular-nums}
+td.prod{white-space:normal;min-width:220px;max-width:320px}
+td.prod .code{color:var(--muted);font-size:12px;display:block}
+tbody tr.row{cursor:pointer} tbody tr.row:hover{background:var(--soft)} tbody tr.row:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+tbody tr.open{background:var(--soft)}
+tr.tot td{font-weight:700;border-top:2px solid var(--line)}
+.grp th{background:var(--soft);text-align:center;border-bottom:none;padding-bottom:2px}
+.tight{max-height:70vh;overflow:auto}
+.ctrls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+input[type=search],select{font:inherit;font-size:14px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);min-width:0}
+input[type=search]{width:240px;max-width:100%}
+.chip{font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:99px;padding:5px 12px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--panel)}
+.chip .n{font-variant-numeric:tabular-nums;opacity:.8;margin-left:4px}
+button.btn{font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:6px 12px;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.flags{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-start}
+.promo{font-size:12px;color:var(--muted);white-space:normal;max-width:220px;text-align:left}
+.promo b{color:var(--ink);font-weight:600}
+.detail td{padding:14px;background:var(--soft);white-space:normal;text-align:left}
+.dgrid{position:sticky;left:14px;display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:16px}
+@media (max-width:900px){.dgrid{grid-template-columns:1fr}}
+.dgrid h3{font-size:15px;margin-bottom:6px}
+.note{font-size:13px;color:var(--muted)}
+.method{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px 28px;font-size:14px}
+.method h3{font-size:15px;margin-bottom:4px}
+.method p{margin:0 0 6px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:8px;font-size:13px;z-index:10}
+.neg{color:var(--quiebre)} .pos{color:var(--merma)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Forecast semanal · Lácteos y Jugos</div>
+    <h1 id="titulo">Forecast semana</h1>
+    <div class="sub" id="subt"></div>
+  </header>
+  <div class="kpis" id="kpis"></div>
+  <section>
+    <div class="sec-head"><h2>Por cadena</h2><span class="note">Haz clic en una cadena para ver sus SKU.</span></div>
+    <div class="card scroll"><table id="t-cad"></table></div>
+  </section>
+  <section id="sec-sku">
+    <div class="sec-head">
+      <h2 id="h-sku">SKU por cadena</h2>
+      <div class="ctrls">
+        <input type="search" id="q" placeholder="Buscar SKU o producto" aria-label="Buscar SKU o producto">
+        <select id="f-cad" aria-label="Cadena"></select>
+        <button class="btn" id="copiar" type="button">Copiar para Excel</button>
+      </div>
+    </div>
+    <div class="ctrls" id="chips"></div>
+    <div class="card tight"><table id="t-sku"></table></div>
+    <div class="note" id="nota"></div>
+  </section>
+  <section>
+    <h2>Qué me falta para afinarlo</h2>
+    <div class="card method" id="faltan"></div>
+  </section>
+</div>
+<div class="toast" id="toast" hidden></div>
+<script>
+const D=/*__DATOS__*/null;
+const S=D.semana, A0=D.anio-1;
+const $=s=>document.querySelector(s);
+const fT=v=>v==null||isNaN(v)?'—':(Math.abs(v)>=100?Math.round(v).toLocaleString('es-CL'):v.toLocaleString('es-CL',{maximumFractionDigits:1,minimumFractionDigits:Math.abs(v)<10&&v!==0?1:0}));
+const fP=v=>v==null||!isFinite(v)?'—':(v>0?'+':'')+(v*100).toLocaleString('es-CL',{maximumFractionDigits:0})+'%';
+const dlt=(a,b)=>b>0?a/b-1:null;
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const U={pct:0.2,t:1};
+const desv=r=>r.fcst>0.05?Math.abs(r.prop-r.fcst)>=U.t&&Math.abs(dlt(r.prop,r.fcst)??1)>=U.pct:r.prop>=U.t;
+function pill(d,abs){if(d==null||!isFinite(d))return '<span class="pill p-neu">—</span>';const c=Math.abs(d)>=U.pct&&Math.abs(abs)>=U.t?(d<0?'p-merma':'p-quiebre'):'p-neu';return `<span class="pill ${c}">${fP(d)}</span>`;}
+const F=D.filas.filter(r=>r.fcst>0.01||r.prop>0.01);
+const lun=new Date(Date.UTC(D.anio,0,4));lun.setUTCDate(lun.getUTCDate()-((lun.getUTCDay()+6)%7)+(S-1)*7);
+const dom=new Date(lun);dom.setUTCDate(dom.getUTCDate()+6);
+const fd=d=>d.toLocaleDateString('es-CL',{day:'numeric',month:'long',timeZone:'UTC'});
+$('#titulo').textContent=`Forecast semana ${S}`;
+$('#subt').innerHTML=`S${S} ${D.anio}: ${fd(lun)} al ${fd(dom)}. Comparo tu FCST de la semana contra una propuesta armada con el Sell In real ${D.anio} (hasta S${D.ult_real}), la misma semana de ${A0} y los precios actuales. Canal Tradicional usa su venta real S${D.vr_sem?D.vr_sem.join('–S'):'—'}.`;
+const tot=k=>F.reduce((a,r)=>a+(r[k]||0),0);
+const kpi=(l,b,u,c)=>`<div class="kpi"><div class="lbl">${l}</div><div class="big">${b} <small>${u}</small></div><div class="cmp">${c}</div></div>`;
+$('#kpis').innerHTML=kpi(`Tu FCST S${S}`,fT(tot('fcst')),'t',`Tu promedio S${S-2}–S${S-1}: ${fT(tot('fcst_prev'))} t`)+
+  kpi(`FCST propuesto S${S}`,fT(tot('prop')),'t',`${fP(dlt(tot('prop'),tot('fcst')))} vs tu FCST`)+
+  kpi('Sell In real reciente',fT(tot('real_rr')),'t/sem',`Promedio S${D.sem_rr[0]}–S${D.sem_rr[1]} (Tradicional S${D.vr_sem?D.vr_sem.join('–S'):''})`)+
+  kpi(`Sell In S${S} ${A0}`,fT(tot('si_ant_sem')),'t','Supermercados con historia');
+const cads=[...new Set(F.map(r=>r.cadena))];
+const C=cads.map(c=>{const x=F.filter(r=>r.cadena===c);const s=k=>x.reduce((a,r)=>a+(r[k]||0),0);return {cad:c,fcst:s('fcst'),prop:s('prop'),real:s('real_rr'),ant:s('si_ant_sem'),prev:s('fcst_prev'),n:x.filter(desv).length,sh:x.every(r=>r.conf==='sin historia')};}).sort((a,b)=>b.fcst-a.fcst);
+let fCad='', chip='desv', q='', orden={k:'adif',dir:-1};
+function drawCad(){
+  let h=`<thead><tr><th class="l">Cadena</th><th>Tu FCST S${S}</th><th>Propuesto S${S}</th><th>Δ</th><th>Δ%</th><th>Sell In real reciente/sem</th><th>Sell In S${S} ${A0}</th><th>Tu FCST S${S-2}–S${S-1}</th><th>SKU a revisar</th></tr></thead><tbody>`;
+  C.forEach(c=>{h+=`<tr class="row${fCad===c.cad?' open':''}" tabindex="0" data-cad="${esc(c.cad)}"><td class="l"><b>${esc(c.cad)}</b>${c.sh?' <span class="pill p-neu">sin historia</span>':''}</td><td>${fT(c.fcst)}</td><td><b>${fT(c.prop)}</b></td><td>${c.prop-c.fcst>0.05?'+':''}${fT(c.prop-c.fcst)}</td><td>${pill(dlt(c.prop,c.fcst),c.prop-c.fcst)}</td><td>${c.real?fT(c.real):'—'}</td><td>${c.ant?fT(c.ant):'—'}</td><td>${fT(c.prev)}</td><td>${c.n||'—'}</td></tr>`;});
+  const s=k=>C.reduce((a,c)=>a+c[k],0);
+  h+=`<tr class="tot"><td class="l">Total</td><td>${fT(s('fcst'))}</td><td>${fT(s('prop'))}</td><td>${fT(s('prop')-s('fcst'))}</td><td>${fP(dlt(s('prop'),s('fcst')))}</td><td>${fT(s('real'))}</td><td>${fT(s('ant'))}</td><td>${fT(s('prev'))}</td><td>${C.reduce((a,c)=>a+c.n,0)}</td></tr></tbody>`;
+  $('#t-cad').innerHTML=h;
+}
+$('#f-cad').innerHTML='<option value="">Todas las cadenas</option>'+C.map(c=>`<option>${esc(c.cad)}</option>`).join('');
+const cf={alta:'p-ok',media:'p-neu',baja:'p-quiebre','sin historia':'p-neu'};
+function porQue(r){
+  const p=[];
+  if(r.fuente==='historia'){p.push(`historia: método A ${fT(r.A)} t (S${S} ${A0} × ritmo ${fP(r.yoy!=null?r.yoy-1:null)}), método B ${fT(r.B)} t (ritmo reciente × estacionalidad ${r.estac!=null?r.estac.toFixed(2).replace('.',','):'—'})`);}
+  else p.push(r.fuente);
+  if(r.nota)p.push(r.nota);
+  if(r.promo)p.push('promo cargada: '+r.promo);
+  if(r.cv!=null&&r.cv>0.8)p.push('compras muy irregulares semana a semana');
+  return p.join(' · ');
+}
+function drawSku(){
+  const base=F.filter(r=>(!fCad||r.cadena===fCad)&&(!q||String(r.sku).includes(q)||r.producto.toLowerCase().includes(q)));
+  const CH=[['desv','Diferencia ≥20% y ≥1 t'],['alto','Tu FCST sobre la propuesta'],['bajo','Tu FCST bajo la propuesta'],['todos','Todos']];
+  const pasa=(r,k)=>k==='todos'||(k==='desv'?desv(r):k==='alto'?desv(r)&&r.fcst>r.prop:desv(r)&&r.fcst<r.prop);
+  $('#chips').innerHTML=CH.map(([k,t])=>`<button class="chip" type="button" data-chip="${k}" aria-pressed="${chip===k}">${t}<span class="n">${base.filter(r=>pasa(r,k)).length}</span></button>`).join('');
+  const rs=base.filter(r=>pasa(r,chip)).map(r=>({...r,adif:Math.abs(r.dif)}));
+  const k=orden.k;rs.sort((a,b)=>{const va=a[k],vb=b[k];return typeof va==='string'?orden.dir*va.localeCompare(vb):orden.dir*((va??-1e9)-(vb??-1e9));});
+  const cols=[['producto','Producto',1],['cadena','Cadena',1],['fcst',`Tu FCST S${S}`],['prop','Propuesto'],['dif','Δ (t)'],['dif_pct','Δ%'],['real_rr','Real reciente/sem'],['si_ant_sem',`S${S} ${A0}`],['conf','Confianza',1],['why','Por qué',1,1]];
+  let h='<thead><tr>'+cols.map(([k,t,l,ns])=>`<th class="${l?'l ':''}${ns?'':'sort'}${orden.k===k?' on':''}" ${ns?'':`data-k="${k}"`}>${t}${orden.k===k?(orden.dir>0?' ▲':' ▼'):''}</th>`).join('')+'</tr></thead><tbody>';
+  let sf=0,sp=0;
+  rs.forEach(r=>{sf+=r.fcst;sp+=r.prop;h+=`<tr><td class="l prod"><b>${esc(r.producto)}</b><span class="code">${r.sku} · ${esc(r.subcat)}</span></td><td class="l">${esc(r.cadena)}</td><td>${fT(r.fcst)}</td><td><b>${fT(r.prop)}</b></td><td>${r.dif>0.05?'+':''}${fT(r.dif)}</td><td>${pill(r.dif_pct,r.dif)}</td><td>${fT(r.real_rr)}</td><td>${fT(r.si_ant_sem)}</td><td class="l"><span class="pill ${cf[r.conf]}">${esc(r.conf)}</span></td><td class="promo" style="max-width:420px;min-width:280px">${esc(porQue(r))}</td></tr>`;});
+  h+=`<tr class="tot"><td class="l">${rs.length} filas</td><td></td><td>${fT(sf)}</td><td>${fT(sp)}</td><td>${fT(sp-sf)}</td><td>${fP(dlt(sp,sf))}</td><td colspan="4"></td></tr></tbody>`;
+  $('#t-sku').innerHTML=h;window._rs=rs;
+  $('#h-sku').textContent=fCad?`SKU de ${fCad}`:'SKU por cadena';
+  $('#nota').innerHTML=`Naranjo = tu FCST está sobre la propuesta (riesgo de merma). Rojo = bajo la propuesta (riesgo de quiebre). La confianza depende de qué tan regular es la compra semanal de ese SKU en esa cadena: a nivel cadena el total es bastante más confiable que cada SKU por separado.`;
+}
+function setCad(c){fCad=c;$('#f-cad').value=c;drawCad();drawSku();}
+$('#t-cad').addEventListener('click',e=>{const tr=e.target.closest('tr[data-cad]');if(tr)setCad(fCad===tr.dataset.cad?'':tr.dataset.cad);});
+$('#t-cad').addEventListener('keydown',e=>{if(e.key==='Enter'){const tr=e.target.closest('tr[data-cad]');if(tr)setCad(fCad===tr.dataset.cad?'':tr.dataset.cad);}});
+$('#f-cad').addEventListener('change',e=>setCad(e.target.value));
+$('#q').addEventListener('input',e=>{q=e.target.value.trim().toLowerCase();drawSku();});
+$('#chips').addEventListener('click',e=>{const b=e.target.closest('[data-chip]');if(b){chip=b.dataset.chip;drawSku();}});
+$('#t-sku').addEventListener('click',e=>{const th=e.target.closest('th[data-k]');if(!th)return;const k=th.dataset.k;orden=orden.k===k?{k,dir:-orden.dir}:{k,dir:['producto','cadena','conf'].includes(k)?1:-1};drawSku();});
+$('#copiar').addEventListener('click',()=>{
+  const num=v=>v==null||!isFinite(v)?'':String(Math.round(v*1000)/1000).replace('.',',');
+  const L=[['SKU','Producto','Subcategoría','Gerencia','Cadena',`Tu FCST S${S}`,'Propuesto','Δ (t)','Δ%','Real reciente/sem',`S${S} ${A0}`,'Confianza','Por qué'].join('\t'),...window._rs.map(r=>[r.sku,r.producto,r.subcat,r.gerencia,r.cadena,num(r.fcst),num(r.prop),num(r.dif),num(r.dif_pct),num(r.real_rr),num(r.si_ant_sem),r.conf,porQue(r)].join('\t'))].join('\n');
+  const ok=()=>{const t=$('#toast');t.textContent=`Copiadas ${window._rs.length} filas.`;t.hidden=false;setTimeout(()=>t.hidden=true,2500);};
+  try{navigator.clipboard.writeText(L).then(ok,()=>{});}catch(e){}
+});
+$('#faltan').innerHTML=__FALTAN__;
+drawCad();drawSku();
+</script>
