@@ -94,6 +94,11 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
     <div class="sec-head"><h2>Por cadena</h2><span class="note">Haz clic en una cadena para ver sus SKU.</span></div>
     <div class="card scroll"><table id="t-cad"></table></div>
   </section>
+  <section id="sec-cpfr" hidden>
+    <div class="sec-head"><h2 id="h-cpfr">Tu forecast vs lo pedido</h2><span class="note" id="n-cpfr"></span></div>
+    <div class="card scroll"><table id="t-cpfr"></table></div>
+    <div class="note" id="n-cpfr2"></div>
+  </section>
   <section id="sec-sku">
     <div class="sec-head">
       <h2 id="h-sku">SKU por cadena</h2>
@@ -116,6 +121,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 <script>
 const D=/*__DATOS__*/null;
 const S=D.semana, A0=D.anio-1;
+const CS=D.cpfr&&D.cpfr.cerradas.length?'S'+D.cpfr.cerradas.join('–S'):'';
 const $=s=>document.querySelector(s);
 const fT=v=>v==null||isNaN(v)?'—':(Math.abs(v)>=100?Math.round(v).toLocaleString('es-CL'):v.toLocaleString('es-CL',{maximumFractionDigits:1,minimumFractionDigits:Math.abs(v)<10&&v!==0?1:0}));
 const fP=v=>v==null||!isFinite(v)?'—':(v>0?'+':'')+(v*100).toLocaleString('es-CL',{maximumFractionDigits:0})+'%';
@@ -129,7 +135,7 @@ const lun=new Date(Date.UTC(D.anio,0,4));lun.setUTCDate(lun.getUTCDate()-((lun.g
 const dom=new Date(lun);dom.setUTCDate(dom.getUTCDate()+6);
 const fd=d=>d.toLocaleDateString('es-CL',{day:'numeric',month:'long',timeZone:'UTC'});
 $('#titulo').textContent=`Forecast semana ${S}`;
-$('#subt').innerHTML=`S${S} ${D.anio}: ${fd(lun)} al ${fd(dom)}. Comparo tu FCST de la semana contra una propuesta armada con el Sell In real ${D.anio} (hasta S${D.ult_real}), la misma semana de ${A0} y los precios actuales. Canal Tradicional usa su venta real S${D.vr_sem?D.vr_sem.join('–S'):'—'}.`;
+$('#subt').innerHTML=`S${S} ${D.anio}: ${fd(lun)} al ${fd(dom)}. Comparo tu FCST de la semana contra una propuesta armada con el Sell In real ${D.anio} (hasta S${D.ult_real}), la misma semana de ${A0} y los precios actuales. Canal Tradicional usa su venta real S${D.vr_sem?D.vr_sem.join("–S"):"—"} (sin CCU/ECUSA, que tiene su propia fila).`;
 const tot=k=>F.reduce((a,r)=>a+(r[k]||0),0);
 const kpi=(l,b,u,c)=>`<div class="kpi"><div class="lbl">${l}</div><div class="big">${b} <small>${u}</small></div><div class="cmp">${c}</div></div>`;
 $('#kpis').innerHTML=kpi(`Tu FCST S${S}`,fT(tot('fcst')),'t',`Tu promedio S${S-2}–S${S-1}: ${fT(tot('fcst_prev'))} t`)+
@@ -164,11 +170,11 @@ function drawSku(){
   $('#chips').innerHTML=CH.map(([k,t])=>`<button class="chip" type="button" data-chip="${k}" aria-pressed="${chip===k}">${t}<span class="n">${base.filter(r=>pasa(r,k)).length}</span></button>`).join('');
   const rs=base.filter(r=>pasa(r,chip)).map(r=>({...r,adif:Math.abs(r.dif)}));
   const k=orden.k;rs.sort((a,b)=>{const va=a[k],vb=b[k];return typeof va==='string'?orden.dir*va.localeCompare(vb):orden.dir*((va??-1e9)-(vb??-1e9));});
-  const cols=[['producto','Producto',1],['cadena','Cadena',1],['fcst',`Tu FCST S${S}`],['prop','Propuesto'],['dif','Δ (t)'],['dif_pct','Δ%'],['real_rr','Real reciente/sem'],['si_ant_sem',`S${S} ${A0}`],['conf','Confianza',1],['why','Por qué',1,1]];
+  const cols=[['producto','Producto',1],['cadena','Cadena',1],['fcst',`Tu FCST S${S}`],['prop','Propuesto'],['dif','Δ (t)'],['dif_pct','Δ%'],['real_rr','Real reciente/sem'],...(D.cpfr?[['ped_sem',`Pedido ${CS}/sem`]]:[]),['si_ant_sem',`S${S} ${A0}`],['conf','Confianza',1],['why','Por qué',1,1]];
   let h='<thead><tr>'+cols.map(([k,t,l,ns])=>`<th class="${l?'l ':''}${ns?'':'sort'}${orden.k===k?' on':''}" ${ns?'':`data-k="${k}"`}>${t}${orden.k===k?(orden.dir>0?' ▲':' ▼'):''}</th>`).join('')+'</tr></thead><tbody>';
   let sf=0,sp=0;
-  rs.forEach(r=>{sf+=r.fcst;sp+=r.prop;h+=`<tr><td class="l prod"><b>${esc(r.producto)}</b><span class="code">${r.sku} · ${esc(r.subcat)}</span></td><td class="l">${esc(r.cadena)}</td><td>${fT(r.fcst)}</td><td><b>${fT(r.prop)}</b></td><td>${r.dif>0.05?'+':''}${fT(r.dif)}</td><td>${pill(r.dif_pct,r.dif)}</td><td>${fT(r.real_rr)}</td><td>${fT(r.si_ant_sem)}</td><td class="l"><span class="pill ${cf[r.conf]}">${esc(r.conf)}</span></td><td class="promo" style="max-width:420px;min-width:280px">${esc(porQue(r))}</td></tr>`;});
-  h+=`<tr class="tot"><td class="l">${rs.length} filas</td><td></td><td>${fT(sf)}</td><td>${fT(sp)}</td><td>${fT(sp-sf)}</td><td>${fP(dlt(sp,sf))}</td><td colspan="4"></td></tr></tbody>`;
+  rs.forEach(r=>{sf+=r.fcst;sp+=r.prop;h+=`<tr><td class="l prod"><b>${esc(r.producto)}</b><span class="code">${r.sku} · ${esc(r.subcat)}</span></td><td class="l">${esc(r.cadena)}</td><td>${fT(r.fcst)}</td><td><b>${fT(r.prop)}</b></td><td>${r.dif>0.05?'+':''}${fT(r.dif)}</td><td>${pill(r.dif_pct,r.dif)}</td><td>${fT(r.real_rr)}</td>${D.cpfr?`<td>${fT(r.ped_sem)}${r.cpfr_cadena==='Cencosud'&&r.ped_sem!=null?'<span class="note"> Jumbo+SISA</span>':''}</td>`:''}<td>${fT(r.si_ant_sem)}</td><td class="l"><span class="pill ${cf[r.conf]}">${esc(r.conf)}</span></td><td class="promo" style="max-width:420px;min-width:280px">${esc(porQue(r))}</td></tr>`;});
+  h+=`<tr class="tot"><td class="l">${rs.length} filas</td><td></td><td>${fT(sf)}</td><td>${fT(sp)}</td><td>${fT(sp-sf)}</td><td>${fP(dlt(sp,sf))}</td><td colspan="${D.cpfr?5:4}"></td></tr></tbody>`;
   $('#t-sku').innerHTML=h;window._rs=rs;
   $('#h-sku').textContent=fCad?`SKU de ${fCad}`:'SKU por cadena';
   $('#nota').innerHTML=`Naranjo = tu FCST está sobre la propuesta (riesgo de merma). Rojo = bajo la propuesta (riesgo de quiebre). La confianza depende de qué tan regular es la compra semanal de ese SKU en esa cadena: a nivel cadena el total es bastante más confiable que cada SKU por separado.`;
@@ -187,5 +193,20 @@ $('#copiar').addEventListener('click',()=>{
   try{navigator.clipboard.writeText(L).then(ok,()=>{});}catch(e){}
 });
 $('#faltan').innerHTML=__FALTAN__;
-drawCad();drawSku();
+function drawCpfr(){
+  if(!D.cpfr)return; const cp=D.cpfr, n=cp.cerradas.length||1;
+  $('#sec-cpfr').hidden=false;
+  $('#h-cpfr').textContent=`Tu forecast vs lo pedido ${CS}`;
+  $('#n-cpfr').textContent=`Reporte CPFR, semanas cerradas. Pedido = Solicitado por la cadena.`;
+  const NN=cp.no_normal||{};const R=Object.entries(cp.cadenas).map(([c,v])=>{const nn=NN[c]||0,sn=v.sol-nn;return {c,...v,nn,ses:sn>0?v.fcst/sn-1:null,sesb:v.sol>0?v.fcst/v.sol-1:null};}).sort((a,b)=>(b.sol||0)-(a.sol||0));
+  const pr=c=>F.filter(r=>r.cpfr_cadena===c).reduce((a,r)=>a+r.prop,0), fc=c=>F.filter(r=>r.cpfr_cadena===c).reduce((a,r)=>a+r.fcst,0);
+  let h=`<thead><tr><th class="l">Cadena</th><th>Tu FCST ${CS}</th><th>Pedido ${CS}</th><th>Sell In ${CS}</th><th>Quebrados</th><th>Venta intermedia + liquidación</th><th>Sesgo tu FCST vs pedido normal</th><th>Pedido normal prom./sem</th><th>Tu FCST S${S}</th><th>Propuesto S${S}</th></tr></thead><tbody>`;
+  R.forEach(r=>{h+=`<tr><td class="l"><b>${esc(r.c)}</b></td><td>${fT(r.fcst)}</td><td>${fT(r.sol)}</td><td>${fT(r.si)}</td><td>${fT(r.queb)}</td><td>${r.nn>0.05?fT(r.nn):'—'}</td><td>${r.ses==null?'—':`<span class="pill ${Math.abs(r.ses)>=0.15?(r.ses>0?'p-merma':'p-quiebre'):'p-neu'}">${fP(r.ses)}</span>`}${r.nn>0.5?`<span class="note"> (con intermedia ${fP(r.sesb)})</span>`:''}</td><td>${fT((r.sol-r.nn)/n)}</td><td>${fT(fc(r.c))}</td><td><b>${fT(pr(r.c))}</b></td></tr>`;});
+  const t=k=>R.reduce((a,r)=>a+(r[k]||0),0);
+  h+=`<tr class="tot"><td class="l">Total</td><td>${fT(t('fcst'))}</td><td>${fT(t('sol'))}</td><td>${fT(t('si'))}</td><td>${fT(t('queb'))}</td><td>${fT(t('nn'))}</td><td>${fP(dlt(t('fcst'),t('sol')-t('nn')))}</td><td>${fT((t('sol')-t('nn'))/n)}</td><td>${fT(tot('fcst'))}</td><td>${fT(tot('prop'))}</td></tr></tbody>`;
+  $('#t-cpfr').innerHTML=h;
+  const ab=cp.pedidos_abiertas||[];
+  $('#n-cpfr2').innerHTML=`Pedido normal = Solicitado menos venta intermedia y liquidación (del reporte TP), que tu FCST no incluye. Naranjo = tu FCST estuvo sobre lo pedido; rojo = bajo.`+(ab.length?` Semanas abiertas (no se usan en el cálculo): ${cp.abiertas.map(w=>`S${w} pedido hasta hoy ${fT(ab.filter(x=>x.semana===w).reduce((a,x)=>a+x.sol,0))} t`).join(', ')}${ab.some(x=>x.semana===cp.abiertas[cp.abiertas.length-1]&&x.cadena==='Cencosud')?`; Cencosud ya tiene ${fT(ab.find(x=>x.semana===cp.abiertas[cp.abiertas.length-1]&&x.cadena==='Cencosud').sol)} t pedidas para la S${cp.abiertas[cp.abiertas.length-1]}`:''}.`:'');
+}
+drawCpfr();drawCad();drawSku();
 </script>

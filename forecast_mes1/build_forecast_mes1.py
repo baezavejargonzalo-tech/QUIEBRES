@@ -122,6 +122,10 @@ def elasticidad_yoy(path):
     return {"e": e, "n": len(pts), "mes": mes, "anios": [a0, a1]}
 
 
+# Clientes que el reporte TP deja en Tradicional y Regiones pero que el forecast lleva en otra gerencia
+EXCLUIR_RUT_TRADICIONAL = {"99501760-1": "CCU / ECUSA (néctares sixpack, ya está en el forecast como CCU)"}
+
+
 def leer_venta_real(path):
     """Sell In real por SKU y semana para Canal Tradicional. Solo VENTA NORMAL
     (se excluyen venta intermedia y liquidación, que son salidas de stock y no demanda)."""
@@ -130,10 +134,13 @@ def leer_venta_real(path):
     h = {str(c).strip(): i for i, c in enumerate(next(filas)) if c is not None}
     ig, ic, it, isk, iw, isi, ia = (h["Gerencia de Venta"], h["Cadena Cliente"], h["Tipo de Venta"], h["SKU"],
                                      h["Semana"], h["Venta Fisica SelI In (TON)"], h["Año"])
+    irut = h.get("Rut Cliente")
     out = defaultdict(lambda: defaultdict(float))
     semanas = set()
     for r in filas:
         if r[ig] != "TRADICIONAL Y REGIONES" or r[ic] == "ALVI SUPERMERCADOS" or r[it] != "VENTA NORMAL":
+            continue
+        if irut is not None and str(r[irut]).strip() in EXCLUIR_RUT_TRADICIONAL:
             continue
         if not isinstance(r[isk], (int, float)) or not isinstance(r[iw], (int, float)):
             continue

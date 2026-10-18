@@ -6,7 +6,8 @@ Uso:
 
 Por SKU×cadena con historia en la hoja "Precio vs SellIn 25-26":
   A = Sell In del año anterior en la semana (promedio centrado de 3 semanas) × ritmo año actual / anterior
-  B = ritmo reciente del año actual × estacionalidad (semana objetivo / semanas recientes, año anterior)
+  B = ritmo reciente del año actual × estacionalidad (semana objetivo / semanas recientes, año anterior);
+      el ritmo reciente pesa más las últimas semanas (el peso se reduce a la mitad cada 3 semanas)
   base = promedio de A y B. Ritmo y estacionalidad se suavizan hacia los de la cadena.
   Tottus con promo: × curva de la hoja Leyenda según la semana relativa al inicio.
 Canal Tradicional: venta normal real de las semanas del archivo TP (promedio semanal).
@@ -30,18 +31,88 @@ K_YOY, K_ESTAC = 30.0, 2.0
 YOY_MIN, YOY_MAX = 0.3, 3.0
 ESTAC_MIN, ESTAC_MAX = 0.6, 1.6
 SEM_RR = 8
+VIDA_MEDIA = 3        # semanas: el peso de cada semana del ritmo reciente se reduce a la mitad cada 3 semanas hacia atrás
 CURVA_TOTTUS = {-2: 0.64, -1: 1.69, 0: 4.32, 1: 2.48, 2: 2.73, 3: 1.25, 4: 0.46}
 
 
 # Datos que más mejorarían la semana (se muestran en la página)
 FALTAN = [
-    ("1 · Sell In real S42 (y S43 al cierre)", "El mismo reporte TP por semana. Hoy la historia llega a la S41; con dos semanas más el ritmo reciente queda al día."),
+    ("1 · Reporte CPFR al cierre de la S42 y la S43", "Cuando cierren, el mismo reporte de semana 40–44 deja el ritmo reciente y el sesgo de tu forecast al día."),
     ("2 · Órdenes de compra ya recibidas para la S44", "Por cadena y SKU (Walmart, Cencosud, Tottus, Unimarc). Es lo que más acota la semana: lo ya pedido es piso del forecast."),
     ("3 · Stock y Sell Out en tienda", "Días de inventario por SKU en Walmart (Retail Link) y Cencosud (B2B). Si la cadena está sobrestockeada, compra menos aunque venda igual."),
     ("4 · Fecha de inicio de la promo Cencosud de noviembre", "Si parte el lunes 26 de octubre, parte del volumen pactado cae en la S44. Hoy asumo que parte en noviembre y no la sumo a la S44."),
     ("5 · Pedidos de Operadores Comerciales", "Compran néctares sixpack semana por medio en pedidos grandes (S36, S38 y S41 altos; S37, S39 y S40 bajos). Si confirmas si la S44 es semana de pedido, Canal Tradicional deja de ser un promedio."),
     ("6 · Catálogo Tottus de noviembre", "La promo Tottus de la S40 cae a 0,46× en la S44 según tu curva. Si hay nueva actividad desde la S44, cambia el número."),
 ]
+
+
+# cadena del reporte CPFR para cada subcadena del forecast
+CPFR_CADENA = {"WALMART": "Walmart", "JUMBO": "Cencosud", "SANTA ISABEL": "Cencosud", "UNIMARC": "Unimarc",
+               "TOTTUS": "Tottus", "ALVI": "Alvi", "SUPERMERCADOS REGION": "Supermercados Region",
+               "CANAL TRADICIONAL": "Canal Tradicional", "CCU · ECUSA": "Ccu",
+               "INDUSTRIAL Y FOOD SERVICE": "Industrial Y Food Service",
+               "INDUSTRIAL Y FOOD SERVICE · JUNAEB": "Industrial Y Food Service",
+               "INDUSTRIAL Y FOOD SERVICE · INDUSTRIAL": "Industrial Y Food Service"}
+
+
+def leer_cpfr(path, skus):
+    """Reporte CPFR semanal (FCST, Solicitado, Venta Sell IN, Quebrados por SKU y cadena).
+    Semanas cerradas = las que ya tienen Sell In; las abiertas solo informan pedidos ya recibidos."""
+    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    filas = wb.worksheets[0].iter_rows(values_only=True)
+    h = {str(c).strip(): i for i, c in enumerate(next(filas)) if c is not None}
+    acc = defaultdict(lambda: defaultdict(float))
+    for r in filas:
+        if r[h["SKU"]] not in skus:
+            continue
+        w = int(str(r[h["Semana"]])[-2:])
+        k = (w, r[h["CADENA"]], r[h["SKU"]])
+        for c, n in (("FCST", "fcst"), ("Solicitado", "sol"), ("Venta Sell IN", "si"), ("Quebrados", "queb")):
+            acc[k][n] += num(r[h[c]])
+    por_sem = defaultdict(float)
+    for (w, _, _), v in acc.items():
+        por_sem[w] += v["si"]
+    cerradas = sorted(w for w, v in por_sem.items() if v > 0)
+    abiertas = sorted(w for w in por_sem if w not in cerradas)
+    cad = defaultdict(lambda: defaultdict(float))
+    sku_cad = defaultdict(lambda: defaultdict(float))
+    ab = defaultdict(float)
+    for (w, c, sku), v in acc.items():
+        if w in cerradas:
+            for n, x in v.items():
+                cad[c][n] += x
+                sku_cad[(sku, c)][n] += x
+        else:
+            ab[(w, c)] += v["sol"]
+    return {"cerradas": cerradas, "abiertas": abiertas,
+            "cadenas": {c: dict(v) for c, v in cad.items()},
+            "sku_cad": {f"{sku}|{c}": dict(v) for (sku, c), v in sku_cad.items()},
+            "pedidos_abiertas": [{"semana": w, "cadena": c, "sol": v} for (w, c), v in sorted(ab.items()) if v > 0.05]}
+
+
+def leer_no_normal(path, semanas):
+    """Venta intermedia y liquidación (TP) por cadena del CPFR y semana: el CPFR la cuenta como pedido,
+    pero tu FCST no la incluye."""
+    from build_forecast_mes1 import EXCLUIR_RUT_TRADICIONAL
+    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    filas = wb.worksheets[0].iter_rows(values_only=True)
+    h = {str(c).strip(): i for i, c in enumerate(next(filas)) if c is not None}
+    ger_cad = {"WALMART": "Walmart", "CENCOSUD": "Cencosud", "SMU": "Unimarc", "TOTTUS": "Tottus",
+               "SUPERMERCADOS REGIONALES": "Supermercados Region", "INDUSTRIAL Y FOOD SERVICE": "Industrial Y Food Service"}
+    out = defaultdict(float)
+    for r in filas:
+        tipo = r[h["Tipo de Venta"]]
+        if tipo not in ("VENTA INTERMEDIA", "VENTA LIQUIDACION") or r[h["Semana"]] not in semanas:
+            continue
+        ger, cad, rut = r[h["Gerencia de Venta"]], r[h["Cadena Cliente"]], str(r[h.get("Rut Cliente", 0)]).strip()
+        if rut in EXCLUIR_RUT_TRADICIONAL:
+            c = "Ccu"
+        elif ger == "TRADICIONAL Y REGIONES":
+            c = "Alvi" if cad == "ALVI SUPERMERCADOS" else "Canal Tradicional"
+        else:
+            c = ger_cad.get(ger, ger)
+        out[c] += num(r[h["Venta Fisica SelI In (TON)"]])
+    return dict(out)
 
 
 def inicio_promo(dur):
@@ -51,7 +122,7 @@ def inicio_promo(dur):
     return dt.date(int(m.group(3)), int(m.group(2)), int(m.group(1))).isocalendar()[1] if m else None
 
 
-def construir(xlsx, semana, anio, venta_real=None):
+def construir(xlsx, semana, anio, venta_real=None, cpfr=None, tp_path=None):
     wb = openpyxl.load_workbook(xlsx, read_only=True, data_only=True)
     fcst, semanas_fcst = leer_fcst(wb, 11)
     hist = leer_precios(wb, anio)
@@ -61,6 +132,8 @@ def construir(xlsx, semana, anio, venta_real=None):
     ult = max(reales)
     sem_yoy = reales
     sem_rr = [w for w in reales if w > ult - SEM_RR]
+    _p = {w: 0.5 ** ((ult - w) / VIDA_MEDIA) for w in sem_rr}
+    pes = {w: v / sum(_p.values()) for w, v in _p.items()}
     vent = [semana - 1, semana, semana + 1]
     vr, vr_sem = venta_real if venta_real else ({}, [])
     vr_w = [w for _, w in vr_sem]
@@ -70,8 +143,8 @@ def construir(xlsx, semana, anio, venta_real=None):
     def factores(h):
         b0 = sum(g(h, w, "si0") for w in sem_yoy)
         b1 = sum(g(h, w, "si1") for w in sem_yoy)
-        rr0 = sum(g(h, w, "si0") for w in sem_rr) / len(sem_rr)
-        rr1 = sum(g(h, w, "si1") for w in sem_rr) / len(sem_rr)
+        rr0 = sum(pes[w] * g(h, w, "si0") for w in sem_rr)
+        rr1 = sum(pes[w] * g(h, w, "si1") for w in sem_rr)
         s0 = sum(g(h, w, "si0") for w in vent) / len(vent)
         return b0, b1, rr0, rr1, s0
 
@@ -133,7 +206,8 @@ def construir(xlsx, semana, anio, venta_real=None):
         elif sub in vr and vr_w:
             real = vr[sub].get(sku, {})
             vals = [real.get(w, 0) for w in vr_w]
-            media = sum(vals) / len(vals)
+            _q = [0.5 ** ((vr_w[-1] - w) / VIDA_MEDIA) for w in vr_w]
+            media = sum(v * q for v, q in zip(vals, _q)) / sum(_q)
             cv = statistics.pstdev(vals) / media if media > 0 else None
             prop = media if media > 0 else r["fcst"]
             row.update({"base": prop, "mult": 1.0, "prop": prop, "real_rr": media, "cv": cv,
@@ -144,7 +218,20 @@ def construir(xlsx, semana, anio, venta_real=None):
         row["dif"] = row["prop"] - row["fcst"]
         row["dif_pct"] = row["prop"] / row["fcst"] - 1 if row["fcst"] > 0 else None
         out.append(row)
-    return {"semana": semana, "anio": anio, "ult_real": ult, "sem_rr": [min(sem_rr), max(sem_rr)],
+    if cpfr:
+        cp = leer_cpfr(cpfr, {r["sku"] for r in out})
+        if tp_path:
+            cp["no_normal"] = leer_no_normal(tp_path, set(cp["cerradas"]))
+        n = len(cp["cerradas"]) or 1
+        for r in out:
+            r["cpfr_cadena"] = CPFR_CADENA.get(r["cadena"], r["cadena"])
+            v = cp["sku_cad"].get(f'{r["sku"]}|{r["cpfr_cadena"]}')
+            if v:
+                r["ped_sem"] = v.get("sol", 0) / n          # pedido promedio semanal SKU×cadena CPFR (Cencosud = Jumbo + Santa Isabel)
+                r["fcst_cpfr_sem"] = v.get("fcst", 0) / n
+    else:
+        cp = None
+    return {"semana": semana, "anio": anio, "ult_real": ult, "sem_rr": [min(sem_rr), max(sem_rr)], "cpfr": cp,
             "vr_sem": [vr_w[0], vr_w[-1]] if vr_w else None, "filas": out}
 
 
@@ -207,6 +294,23 @@ def escribir_excel(d, path):
         ws.column_dimensions[get_column_letter(j)].width = w
     ws.freeze_panes = "C2"
     ws.auto_filter.ref = f"A1:V{n}"
+    if d.get("cpfr"):
+        cp = d["cpfr"]; sem = "–".join(f"S{w}" for w in cp["cerradas"])
+        ws = wb.create_sheet(f"Precisión {sem}")
+        ws.append(["Cadena CPFR", f"Tu FCST {sem} (t)", f"Pedido (Solicitado) {sem} (t)", f"Sell In {sem} (t)", "Quebrados (t)", "Sesgo FCST vs pedido",
+                   "Venta intermedia + liquidación (t)", "Sesgo FCST vs pedido sin intermedia"])
+        for c in ws[1]:
+            c.font = Font(bold=True, color="FFFFFF"); c.fill = hdr; c.alignment = Alignment(wrap_text=True, vertical="center")
+        for c, v in sorted(cp["cadenas"].items(), key=lambda x: -x[1].get("sol", 0)):
+            ws.append([c, round(v.get("fcst", 0), 1), round(v.get("sol", 0), 1), round(v.get("si", 0), 1), round(v.get("queb", 0), 1),
+                       v["fcst"] / v["sol"] - 1 if v.get("sol") else None])
+            nn = cp.get("no_normal", {}).get(c, 0.0)
+            ws.cell(ws.max_row, 7).value = round(nn, 1)
+            ws.cell(ws.max_row, 8).value = v["fcst"] / (v["sol"] - nn) - 1 if v.get("sol", 0) - nn > 0 else None
+            for col in (6, 8):
+                ws.cell(ws.max_row, col).number_format = "+0%;-0%;0%"
+        for j, w in enumerate([28, 14, 16, 14, 12, 14, 16, 18], 1):
+            ws.column_dimensions[get_column_letter(j)].width = w
     m = wb.create_sheet("Cómo se calcula")
     for t in (__doc__ or "").strip().splitlines():
         m.append([t])
@@ -222,11 +326,12 @@ def main():
     ap.add_argument("--semana", type=int, required=True)
     ap.add_argument("--anio", type=int, default=dt.date.today().year)
     ap.add_argument("--venta-real", default=None)
+    ap.add_argument("--cpfr", default=None, help="reporte CPFR semanal (FCST, Solicitado, Sell In por SKU y cadena)")
     ap.add_argument("--out", required=True)
     ap.add_argument("--json", default=None)
     ap.add_argument("--html", default=None, help="página para revisar la semana (usa plantilla_semana.html)")
     a = ap.parse_args()
-    d = construir(a.xlsx, a.semana, a.anio, leer_venta_real(a.venta_real) if a.venta_real else None)
+    d = construir(a.xlsx, a.semana, a.anio, leer_venta_real(a.venta_real) if a.venta_real else None, a.cpfr, a.venta_real)
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)
     escribir_excel(d, a.out)
     if a.html:
