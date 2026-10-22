@@ -58,3 +58,15 @@ Insumo: plan de una cadena (mensual o bimensual).
 - `index.html` + `assets/` = Dashboard de Quiebres (ver `README.md` y `brief_dashboard_quiebres.md`).
 - `assets/js/data.js` contiene los datos procesados (ALCANCE, WMS, LOGISTICO). Última actualización conocida: archivos del 08-09-2026.
 - `data/plantilla_datos_quiebres.xlsx` = plantilla para cargar el detalle completo.
+- `herramientas/Herramienta_Demand_Planner.xlsx` = tablero de excepciones + ABC/XYZ + stock de seguridad + cadenas vs FCST. Se regenera con
+  `python3 herramientas/build_herramienta.py <carpeta_uploads>/ <salida.xlsx> seguimiento/vida_util_historial.csv` (ajustar nombres de archivo dentro del script) y luego recalcular con LibreOffice.
+- `seguimiento/vida_util_historial.csv` = foto de VU por SKU en cada informe de stock país (agregar filas, no sobrescribir).
+
+## Cómo leer los archivos del usuario (validado)
+
+- **base_1.xlsx** (hoja BASE1): SKU × cadena × semana. FCST/Solicitado/Venta Real en **toneladas** (×1000 para kg). Usar *Solicitado* como demanda (la venta real está censurada por quiebres).
+- **Stock_País_stock_<fecha>.xlsx**: una fila por SKU, en kg. Alcance (sem) = Disp+XLIB / Fcst sem.
+- **Informe_Stock_País_<fecha>.xlsx** (DETALLE WMS): una fila por lote. `PORCENTAJE` = % de VU **avanzada/consumida**; usar estados OK + XLIB; `FECHA_LIBERACION` aplica a lotes XLIB.
+- **Filtros_<mes>.xlsx**: el % por cadena (columnas "... WMS") es el **avance MÁXIMO de VU que la cadena acepta** (no VU restante). Cadena más exigente = la de % más bajo. Valores 0 = sin filtro.
+- Alerta VU: lote a ≤ 6 pts del tope de la cadena más exigente (regla del usuario).
+- Ojo con la última semana de la base: puede venir cargada incompleta (S42 del 22-10-2026 venía −35%); verificar antes de usarla.
