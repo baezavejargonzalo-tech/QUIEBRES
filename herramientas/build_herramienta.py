@@ -15,7 +15,7 @@ TAG = f' — {GRUPO.title()}' if GRUPO else ''
 F_STOCK = U + '0bc6e28a-Stock_Pa_s_stock_2026-10-22.xlsx'
 F_WMS = U + '950752a6-Informe_Stock_Pa_s_2026-10-22.xlsx'
 F_FIL = U + '69fad528-Filtros_Mayo_2026_6_1.xlsx'
-F_BASE = U + '9238154f-base_1.xlsx'
+F_BASE = U + (sys.argv[5] if len(sys.argv) > 5 else '9238154f-base_1.xlsx')
 
 # ---------------- datos ----------------
 base = pd.read_excel(F_BASE)
@@ -25,9 +25,17 @@ if GRUPO:
 base['Cat DMD'] = base['Cat DMD'].where(base['Cat DMD'].ne('-'), base['Categoria Producto'])
 for c in ['FCST', 'Solicitado']:
     base[c] = base[c] * 1000  # ton -> kg
-WEEKS = [202636, 202637, 202638, 202639, 202640, 202641, 202642]
-STAT_WEEKS = WEEKS[:6]          # S36-S41 completas
-DEV_WEEKS = [202638, 202639, 202640, 202641]  # últimas 4 completas
+# Semanas: la última se descarta si viene cargada incompleta (< 60% de la mediana)
+_ws = base.groupby('Semana').Solicitado.sum().sort_index()
+PARTIAL = [w for w in _ws.index[-2:] if _ws[w] < 0.6 * _ws.median()]
+COMPLETE = [w for w in _ws.index if w not in PARTIAL]
+WEEKS = COMPLETE[-13:] + PARTIAL[-1:]      # se muestran hasta 13 completas + la parcial
+STAT_WEEKS = COMPLETE[-13:]
+DEV_WEEKS = COMPLETE[-4:]                  # últimas 4 completas
+NS, NW = len(STAT_WEEKS), len(WEEKS)
+SW = lambda w: f'S{str(w)[-2:]}'
+RANGO_STAT = f'{SW(STAT_WEEKS[0])} a {SW(STAT_WEEKS[-1])}'
+RANGO_DEV = f'{SW(DEV_WEEKS[0])} a {SW(DEV_WEEKS[-1])}'
 
 info = (base.sort_values('Semana').groupby('SKU')
         .agg(prod=('Nombre Producto', 'last'), cat=('Cat DMD', 'last'),
@@ -161,7 +169,7 @@ rows = [
     ('Nivel de servicio A', 0.98, PCT, 'Supuesto inicial (benchmark internacional). Ajustar según política Watt\'s.'),
     ('Nivel de servicio B', 0.95, PCT, 'Supuesto inicial.'),
     ('Nivel de servicio C', 0.90, PCT, 'Supuesto inicial.'),
-    ('Nivel de servicio SKU sin historial', 0.95, PCT, 'Para SKU sin ventas en la base S36-S41.'),
+    ('Nivel de servicio SKU sin historial', 0.95, PCT, f'Para SKU sin ventas en la base {RANGO_STAT}.'),
     ('Lead time por defecto (semanas)', 1.0, DEC, 'SUPUESTO: no se recibió lead time real. Reemplazar por categoría en la tabla de abajo.'),
     ('σ por defecto (% del FCST semanal) si no hay historial', 0.30, PCT, 'SUPUESTO para SKU sin historial de pedidos.'),
     ('Umbral desviación pedido vs FCST (±)', 0.20, PCT, 'Alerta si |Solicitado/FCST − 1| supera este valor.'),
@@ -229,7 +237,7 @@ widths(P, [52, 18, 95])
 D = wb.create_sheet('Datos_Semanales')
 D['A1'] = 'Pedidos (Solicitado) y FCST semanales por SKU, en kg — fuente: base_1.xlsx (todas las cadenas sumadas)' + TAG
 D['A1'].font = F_ST
-D['A2'] = 'S42 parece cargada incompleta (Solicitado −35% vs S41 en todas las cadenas): no se usa en los cálculos. S38 incluye Fiestas Patrias.'
+D['A2'] = (f'Cálculos con {RANGO_STAT} (semanas completas). ' + (f'{SW(PARTIAL[-1])} viene parcial: se muestra pero no se usa. ' if PARTIAL else '') + 'S38 incluye Fiestas Patrias.')
 D['A2'].font = Font(name=AR, size=10, italic=True, color='C00000')
 dcols = ['SKU', 'Producto', 'Categoría', 'Almacenamiento', 'Foco'] + \
     [f'Sol S{str(w)[-2:]}' for w in WEEKS] + [f'FCST S{str(w)[-2:]}' for w in WEEKS]
@@ -245,22 +253,22 @@ for i, (sku, r) in enumerate(dem.iterrows(), 5):
 DN = 4 + len(dem)
 D.freeze_panes = 'C5'
 D.auto_filter.ref = f'A4:{L(len(dcols))}{DN}'
-widths(D, [11, 42, 22, 13, 10] + [10] * 14)
+widths(D, [11, 42, 22, 13, 10] + [10] * (2 * NW))
 
 # ---------------- ABC_XYZ ----------------
 A = wb.create_sheet('ABC_XYZ')
-A['A1'] = 'Segmentación ABC (volumen) / XYZ (variabilidad) — pedidos S36 a S41' + TAG
+A['A1'] = f'Segmentación ABC (volumen) / XYZ (variabilidad) — pedidos {RANGO_STAT}' + TAG
 A['A1'].font = F_T
 A['A2'] = 'Todo se calcula con fórmulas desde Datos_Semanales y Parametros. Filtra la columna Segmento para ver tu lista de foco (AY, AZ, BZ).'
 A['A2'].font = F_N
-acols = ['SKU', 'Producto', 'Categoría', 'Total pedido 6 sem (kg)', 'Promedio sem (kg)', 'Desv. estándar (kg)',
+acols = ['SKU', 'Producto', 'Categoría', f'Total pedido {NS} sem (kg)', 'Promedio sem (kg)', 'Desv. estándar (kg)',
          'CV', '% del volumen', '% acumulado', 'ABC', 'XYZ', 'Segmento', 'Cómo planificarlo', 'Revisión',
-         'FCST 6 sem (kg)', 'WMAPE forecast', 'Sesgo (Bias)', 'Error forecast RMSE (kg/sem)']
+         f'FCST {NS} sem (kg)', 'WMAPE forecast', 'Sesgo (Bias)', 'Error forecast RMSE (kg/sem)']
 header(A, 4, acols)
 first, last = 5, DN
 for i in range(first, last + 1):
-    sol_rng = f'Datos_Semanales!F{i}:K{i}'
-    fc_rng = f'Datos_Semanales!M{i}:R{i}'
+    sol_rng = f'Datos_Semanales!{L(6)}{i}:{L(5 + NS)}{i}'
+    fc_rng = f'Datos_Semanales!{L(6 + NW)}{i}:{L(5 + NW + NS)}{i}'
     f = {
         1: f'=Datos_Semanales!A{i}', 2: f'=Datos_Semanales!B{i}', 3: f'=Datos_Semanales!C{i}',
         4: f'=SUM({sol_rng})', 5: f'=AVERAGE({sol_rng})', 6: f'=STDEV({sol_rng})',
@@ -364,7 +372,7 @@ widths(S, [11, 40, 20, 13, 12, 9, 9, 6, 11, 11, 9, 11, 9, 10, 15, 9, 12, 11, 12,
 
 # ---------------- Cadenas ----------------
 C = wb.create_sheet('Cadenas_vs_FCST')
-C['A1'] = 'Pedidos por cadena vs FCST — últimas 4 semanas completas (S38 a S41)' + TAG
+C['A1'] = f'Pedidos por cadena vs FCST — últimas 4 semanas completas ({RANGO_DEV})' + TAG
 C['A1'].font = F_T
 C['A2'] = 'Resumen por cadena arriba; detalle SKU × cadena abajo (filtra la columna Alerta).'
 C['A2'].font = F_N
@@ -520,7 +528,7 @@ intro = [
     '• Excepciones — tu tablero diario. Una fila por SKU; solo mira las que tienen alerta. Columna "Qué revisar" te dice la acción.',
     '• Stock_Seguridad — cálculo de SS, punto de reorden y techo por vida útil para cada SKU.',
     '• ABC_XYZ — segmentación de cada SKU y cómo planificarlo. Incluye calidad del forecast (WMAPE y sesgo).',
-    '• Cadenas_vs_FCST — qué cadena pidió más y cuál se desvió más del forecast (S38-S41).',
+    f'• Cadenas_vs_FCST — qué cadena pidió más y cuál se desvió más del forecast ({RANGO_DEV}).',
     '• Parametros — celdas amarillas editables: cortes, niveles de servicio, lead time, umbrales.',
     '• Datos_Semanales — pedidos y FCST por SKU (fuente). Para actualizar: pega las semanas nuevas aquí.',
     'Convención de colores: texto azul en celda amarilla = dato que tú editas. Texto negro = fórmula. Texto verde = viene de otra hoja.',

@@ -60,7 +60,7 @@ Insumo: plan de una cadena (mensual o bimensual).
 - `assets/js/data.js` contiene los datos procesados (ALCANCE, WMS, LOGISTICO). Última actualización conocida: archivos del 08-09-2026.
 - `data/plantilla_datos_quiebres.xlsx` = plantilla para cargar el detalle completo.
 - `herramientas/Herramienta_Lacteos_y_Jugos.xlsx` = tablero de excepciones + ABC/XYZ + stock de seguridad + cadenas vs FCST. Se regenera con
-  `python3 herramientas/build_herramienta.py <carpeta_uploads>/ <salida.xlsx> seguimiento/vida_util_historial.csv "GRUPO LACTEOS Y JUGOS"` (ajustar nombres de archivo dentro del script) y luego recalcular con LibreOffice.
+  `python3 herramientas/build_herramienta.py <carpeta_uploads>/ <salida.xlsx> seguimiento/vida_util_historial.csv "GRUPO LACTEOS Y JUGOS"` [nombre_archivo_base.xlsx] (las semanas completas/parciales se detectan solas) y luego recalcular con LibreOffice.
 - `seguimiento/vida_util_historial.csv` = foto de VU por SKU en cada informe de stock país (agregar filas, no sobrescribir).
 
 ## Cómo leer los archivos del usuario (validado)
