@@ -10,6 +10,8 @@ from openpyxl.utils import get_column_letter as L
 U = sys.argv[1]
 OUT = sys.argv[2]
 SNAP = sys.argv[3]
+GRUPO = sys.argv[4] if len(sys.argv) > 4 else None  # ej. 'GRUPO LACTEOS Y JUGOS'
+TAG = f' — {GRUPO.title()}' if GRUPO else ''
 F_STOCK = U + '0bc6e28a-Stock_Pa_s_stock_2026-10-22.xlsx'
 F_WMS = U + '950752a6-Informe_Stock_Pa_s_2026-10-22.xlsx'
 F_FIL = U + '69fad528-Filtros_Mayo_2026_6_1.xlsx'
@@ -18,6 +20,9 @@ F_BASE = U + '9238154f-base_1.xlsx'
 # ---------------- datos ----------------
 base = pd.read_excel(F_BASE)
 base['SKU'] = pd.to_numeric(base['SKU'], errors='coerce')
+if GRUPO:
+    base = base[base['Grupo Marketing'] == GRUPO]
+base['Cat DMD'] = base['Cat DMD'].where(base['Cat DMD'].ne('-'), base['Categoria Producto'])
 for c in ['FCST', 'Solicitado']:
     base[c] = base[c] * 1000  # ton -> kg
 WEEKS = [202636, 202637, 202638, 202639, 202640, 202641, 202642]
@@ -43,6 +48,8 @@ CADENAS = sorted(cad.CADENA.unique())
 stock = pd.read_excel(F_STOCK)
 stock['SKU'] = pd.to_numeric(stock['SKU'], errors='coerce')
 stock = stock.dropna(subset=['SKU'])
+if GRUPO:
+    stock = stock[stock.SKU.isin(base.SKU)]
 
 fil = pd.read_excel(F_FIL, header=None)
 fil = fil.iloc[1:]
@@ -78,7 +85,7 @@ st = stock.set_index('SKU').join(ft).join(lot, rsuffix='_l')
 st = st.sort_values('Fcst sem (kg)', ascending=False)
 
 # snapshot de VU para seguimiento histórico
-snap = lot.join(ft[['tope_min', 'cad_exig']]).join(stock.set_index('SKU')[['Producto']])
+snap = lot.join(ft[['tope_min', 'cad_exig']]).join(stock.set_index('SKU')[['Producto']], how='inner')
 snap = snap.reset_index()
 snap.insert(0, 'fecha_informe', '2026-10-22')
 snap = snap[['fecha_informe', 'SKU', 'Producto', 'kg', 'av_pond', 'av_max', 'tope_min', 'cad_exig', 'fuera', 'zona', 'fuera_todas']]
@@ -220,7 +227,7 @@ widths(P, [52, 18, 95])
 
 # ---------------- Datos_Semanales ----------------
 D = wb.create_sheet('Datos_Semanales')
-D['A1'] = 'Pedidos (Solicitado) y FCST semanales por SKU, en kg — fuente: base_1.xlsx (todas las cadenas sumadas)'
+D['A1'] = 'Pedidos (Solicitado) y FCST semanales por SKU, en kg — fuente: base_1.xlsx (todas las cadenas sumadas)' + TAG
 D['A1'].font = F_ST
 D['A2'] = 'S42 parece cargada incompleta (Solicitado −35% vs S41 en todas las cadenas): no se usa en los cálculos. S38 incluye Fiestas Patrias.'
 D['A2'].font = Font(name=AR, size=10, italic=True, color='C00000')
@@ -242,7 +249,7 @@ widths(D, [11, 42, 22, 13, 10] + [10] * 14)
 
 # ---------------- ABC_XYZ ----------------
 A = wb.create_sheet('ABC_XYZ')
-A['A1'] = 'Segmentación ABC (volumen) / XYZ (variabilidad) — pedidos S36 a S41'
+A['A1'] = 'Segmentación ABC (volumen) / XYZ (variabilidad) — pedidos S36 a S41' + TAG
 A['A1'].font = F_T
 A['A2'] = 'Todo se calcula con fórmulas desde Datos_Semanales y Parametros. Filtra la columna Segmento para ver tu lista de foco (AY, AZ, BZ).'
 A['A2'].font = F_N
@@ -305,7 +312,7 @@ A.cell(14, rc, 'Interpretación: la fila A concentra el 80% del volumen. La colu
 
 # ---------------- Stock_Seguridad ----------------
 S = wb.create_sheet('Stock_Seguridad')
-S['A1'] = 'Stock de seguridad calculado — SS = Z × σ × √(Lead time), con techo por vida útil'
+S['A1'] = 'Stock de seguridad calculado — SS = Z × σ × √(Lead time), con techo por vida útil' + TAG
 S['A1'].font = F_T
 S['A2'] = ('σ = error del forecast (RMSE semanal Solicitado vs FCST): es lo que el SS debe cubrir. Techo VU: el stock objetivo '
            'no puede superar lo que se vende antes de llegar al filtro de la cadena más exigente.')
@@ -357,7 +364,7 @@ widths(S, [11, 40, 20, 13, 12, 9, 9, 6, 11, 11, 9, 11, 9, 10, 15, 9, 12, 11, 12,
 
 # ---------------- Cadenas ----------------
 C = wb.create_sheet('Cadenas_vs_FCST')
-C['A1'] = 'Pedidos por cadena vs FCST — últimas 4 semanas completas (S38 a S41)'
+C['A1'] = 'Pedidos por cadena vs FCST — últimas 4 semanas completas (S38 a S41)' + TAG
 C['A1'].font = F_T
 C['A2'] = 'Resumen por cadena arriba; detalle SKU × cadena abajo (filtra la columna Alerta).'
 C['A2'].font = F_N
@@ -408,7 +415,7 @@ widths(C, [24, 42, 24, 14, 14, 14, 12, 16])
 
 # ---------------- Excepciones ----------------
 E = wb.create_sheet('Excepciones', 1)
-E['A1'] = 'Tablero de excepciones — revisa solo lo que tiene alerta'
+E['A1'] = 'Tablero de excepciones — revisa solo lo que tiene alerta' + TAG
 E['A1'].font = F_T
 E['A2'] = 'Ordena por Puntaje (mayor a menor) y trabaja de arriba hacia abajo. Puntaje = (Quiebre×3 + Encubierto×2 + Merma/VU×2 + Desviación×1) × peso ABC (A=3, B=2, C=1). Cada fila dice qué revisar. Datos al 22-10-2026.'
 E['A2'].font = F_N
@@ -506,7 +513,7 @@ G.column_dimensions['A'].width = 4
 for col, w in zip('BCDEFGHIJ', [30, 12, 12, 12, 12, 12, 12, 14, 40]):
     G.column_dimensions[col].width = w
 r = 1
-G.cell(r, 2, 'Herramienta Demand Planner — Watt\'s (datos al 22-10-2026)').font = F_T
+G.cell(r, 2, 'Herramienta Demand Planner — Watt\'s' + TAG + ' (datos al 22-10-2026)').font = F_T
 r += 2
 intro = [
     'Hojas de este libro:',

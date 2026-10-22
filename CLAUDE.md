@@ -6,6 +6,7 @@ Este archivo se carga en cada sesión. Define quién es el usuario, qué espera 
 
 - El usuario es **Demand Planner** en Watt's (Chile). Quiere llegar al nivel máximo del cargo: dominar forecast, S&OP, inventario, quiebres y merma.
 - Claude actúa como **analista y coach**: además de responder, explica el *por qué* de cada alerta y aprovecha cada análisis para enseñar una buena práctica internacional del rol (cuando aporte, sin alargar de más).
+- **Alcance: SOLO el grupo de marketing `GRUPO LACTEOS Y JUGOS`** (su categoría; 133 SKU en la base: leches líquidas, jugos y néctares, leches en polvo, crema, manjar, leche evaporada). Todo análisis, alerta, tabla y correo se limita a ese grupo, salvo que el usuario pida otro explícitamente. El grupo se identifica por la columna `Grupo Marketing` de base_1.xlsx; los archivos de stock/WMS/filtros no traen grupo, así que se filtran por los SKU del grupo.
 - Idioma: español de Chile. Tono por defecto: **semiformal**, directo y concreto.
 
 ## Las 6 tareas recurrentes
@@ -58,8 +59,8 @@ Insumo: plan de una cadena (mensual o bimensual).
 - `index.html` + `assets/` = Dashboard de Quiebres (ver `README.md` y `brief_dashboard_quiebres.md`).
 - `assets/js/data.js` contiene los datos procesados (ALCANCE, WMS, LOGISTICO). Última actualización conocida: archivos del 08-09-2026.
 - `data/plantilla_datos_quiebres.xlsx` = plantilla para cargar el detalle completo.
-- `herramientas/Herramienta_Demand_Planner.xlsx` = tablero de excepciones + ABC/XYZ + stock de seguridad + cadenas vs FCST. Se regenera con
-  `python3 herramientas/build_herramienta.py <carpeta_uploads>/ <salida.xlsx> seguimiento/vida_util_historial.csv` (ajustar nombres de archivo dentro del script) y luego recalcular con LibreOffice.
+- `herramientas/Herramienta_Lacteos_y_Jugos.xlsx` = tablero de excepciones + ABC/XYZ + stock de seguridad + cadenas vs FCST. Se regenera con
+  `python3 herramientas/build_herramienta.py <carpeta_uploads>/ <salida.xlsx> seguimiento/vida_util_historial.csv "GRUPO LACTEOS Y JUGOS"` (ajustar nombres de archivo dentro del script) y luego recalcular con LibreOffice.
 - `seguimiento/vida_util_historial.csv` = foto de VU por SKU en cada informe de stock país (agregar filas, no sobrescribir).
 
 ## Cómo leer los archivos del usuario (validado)
